@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Cognia.API/Cognia.API.csproj" />
+  <Project Path="Cognia.Client/Cognia.Client.csproj" />
+  <Project Path="Cognia.Shared/Cognia.Shared.csproj" />
+</Solution>
