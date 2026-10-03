@@ -117,11 +117,11 @@
 - [ ] Test user flows
 
 #### Tetteh Joel Oglie Nathan (QA)
-- [ ] Create test plan
-- [ ] Start unit testing
-- [ ] Begin integration testing
-- [ ] Track initial bugs
-- [ ] Set up bug tracking
+- [x] Create test plan
+- [x] Start unit testing
+- [x] Begin integration testing
+- [x] Track initial bugs
+- [x] Set up bug tracking
 
 ---
 
@@ -169,11 +169,11 @@
 ### Day 10-11 (Oct 2-3): Testing & Bug Fixes
 
 #### Tetteh Joel Oglie Nathan (QA)
-- [ ] Full system testing
-- [ ] Cross-browser testing
-- [ ] Mobile responsiveness testing
-- [ ] Performance testing
-- [ ] Security testing
+- [x] Full system testing
+- [x] Cross-browser testing
+- [x] Mobile responsiveness testing
+- [x] Performance testing
+- [x] Security testing
 
 #### All Members
 - [ ] Fix assigned bugs
