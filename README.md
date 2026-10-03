@@ -126,14 +126,15 @@ The API will run on `https://localhost:5001`
 
 ### 7. Run the Frontend (Blazor)
 
-In a new terminal:
+Open a second terminal at the repository root. Restore and run the Blazor client:
 
 ```bash
 cd Cognia.Client
-dotnet run
+dotnet restore
+dotnet run --launch-profile http
 ```
 
-The Blazor app will run on `https://localhost:5000`
+Open `http://localhost:5000` in your browser. Keep this terminal running while using the frontend.
 
 ## Default Admin Account
 

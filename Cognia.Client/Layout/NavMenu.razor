@@ -1,44 +1,12 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">Cognia.Client</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-    </div>
-</div>
-
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="mood-tracker">
-                <span class="bi bi-emoji-smile-fill-nav-menu" aria-hidden="true"></span> Mood Tracker
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="self-help">
-                <span class="bi bi-book-half-nav-menu" aria-hidden="true"></span> Self-Help Hub
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="forum">
-                <span class="bi bi-chat-square-text-fill-nav-menu" aria-hidden="true"></span> Safe Space Forum
-            </NavLink>
-        </div>
+﻿<header class="site-header">
+    <a class="brand" href="/" aria-label="Cognia home">
+        <span class="brand-mark" aria-hidden="true">c</span>
+        <span>cognia<span class="brand-period">.</span></span>
+    </a>
+    <nav class="main-nav" aria-label="Main navigation">
+        <NavLink href="/mood-tracker">Mood tracker</NavLink>
+        <NavLink href="/self-help">Self-help library</NavLink>
+        <NavLink href="/forum">Safe Space Forum</NavLink>
     </nav>
-</div>
-
-@code {
-    private bool collapseNavMenu = true;
-
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
-
-    private void ToggleNavMenu()
-    {
-        collapseNavMenu = !collapseNavMenu;
-    }
-}
+    <a class="header-action" href="/#check-in">Take a moment <span aria-hidden="true">↗</span></a>
+</header>

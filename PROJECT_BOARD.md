@@ -71,11 +71,11 @@
 - [ ] Implement responsive design
 
 #### Noye Magdalene Norkai (UI/UX)
-- [ ] Design mood input interface
-- [ ] Design dashboard layout
-- [ ] Create color scheme and typography
-- [ ] Design article display cards
-- [ ] Create accessibility features
+- [x] Design mood input interface
+- [x] Design dashboard layout
+- [x] Create color scheme and typography
+- [x] Design article display cards
+- [x] Create accessibility features
 
 #### Marie-Anne Dzifa Hayibor (Forum)
 - [ ] Design forum data model
