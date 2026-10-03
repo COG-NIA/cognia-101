@@ -1,0 +1,486 @@
+@page "/forum"
+@using Cognia.Shared.Models
+@inject HttpClient Http
+
+<PageTitle>Safe Space Forum</PageTitle>
+
+<div class="forum-shell">
+    <div class="forum-header">
+        <div>
+            <p class="eyebrow">Community</p>
+            <h1>Safe Space Forum</h1>
+        </div>
+        <button class="primary-button" @onclick="ToggleComposer">New topic</button>
+    </div>
+
+    @if (categories.Count > 0)
+    {
+        <div class="category-row">
+            @foreach (var category in categories)
+            {
+                <button class="category-pill @(selectedCategory == category ? "active" : string.Empty)" @onclick="() => FilterByCategory(category)">
+                    @category
+                </button>
+            }
+        </div>
+    }
+
+    @if (showComposer)
+    {
+        <EditForm Model="newThread" OnValidSubmit="CreateThreadAsync">
+            <div class="composer-card">
+                <h3>Start a new conversation</h3>
+
+                <div class="field-row">
+                    <div class="field-group">
+                        <label>Title</label>
+                        <InputText @bind-Value="newThread.Title" />
+                    </div>
+                    <div class="field-group">
+                        <label>Category</label>
+                        <InputSelect @bind-Value="newThread.Category">
+                            @foreach (var category in categories)
+                            {
+                                <option value="@category">@category</option>
+                            }
+                        </InputSelect>
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <label>Name</label>
+                    <InputText @bind-Value="newThread.Author" />
+                </div>
+
+                <div class="field-group">
+                    <label>Post</label>
+                    <InputTextArea @bind-Value="newThread.Content" rows="5" />
+                </div>
+
+                <label class="checkbox-row">
+                    <InputCheckbox @bind-Value="newThread.IsAnonymous" />
+                    Post anonymously
+                </label>
+
+                <div class="button-row">
+                    <button class="primary-button" type="submit">Publish thread</button>
+                    <button class="secondary-button" type="button" @onclick="ToggleComposer">Cancel</button>
+                </div>
+            </div>
+        </EditForm>
+    }
+
+    <div class="forum-layout">
+        <section class="thread-list">
+            @if (filteredThreads.Count == 0)
+            {
+                <div class="empty-state">
+                    <h3>No conversations yet</h3>
+                    <p>Be the first to start a supportive thread for this community.</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var thread in filteredThreads)
+                {
+                    <article class="thread-card @(selectedThread?.Id == thread.Id ? "selected" : string.Empty)" @onclick="() => SelectThread(thread)">
+                        <div class="thread-meta">
+                            <span class="badge">@thread.Category</span>
+                            <span>@thread.CreatedAt.ToString("MMM dd")</span>
+                        </div>
+                        <h3>@thread.Title</h3>
+                        <p>@thread.Content</p>
+                        <div class="thread-footer">
+                            <strong>@(thread.IsAnonymous ? "Anonymous" : thread.Author)</strong>
+                            <span>@thread.Replies.Count replies</span>
+                        </div>
+                    </article>
+                }
+            }
+        </section>
+
+        <aside class="thread-panel">
+            @if (selectedThread is null)
+            {
+                <div class="empty-state">
+                    <h3>Select a topic</h3>
+                    <p>Open any thread to view its replies and join the conversation.</p>
+                </div>
+            }
+            else
+            {
+                <div class="thread-panel-card">
+                    <div class="thread-meta">
+                        <span class="badge">@selectedThread.Category</span>
+                        <span>@selectedThread.CreatedAt.ToString("MMM dd, yyyy")</span>
+                    </div>
+                    <h2>@selectedThread.Title</h2>
+                    <p class="byline">Posted by @(selectedThread.IsAnonymous ? "Anonymous" : selectedThread.Author)</p>
+                    <p class="content-body">@selectedThread.Content</p>
+
+                    <div class="reply-list">
+                        @if (selectedThread.Replies.Count == 0)
+                        {
+                            <p class="muted">No replies yet. Start the conversation.</p>
+                        }
+                        else
+                        {
+                            @foreach (var reply in selectedThread.Replies)
+                            {
+                                <div class="reply-item">
+                                    <div class="reply-header">
+                                        <strong>@(reply.IsAnonymous ? "Anonymous" : reply.Author)</strong>
+                                        <span>@reply.CreatedAt.ToString("MMM dd")</span>
+                                    </div>
+                                    <p>@reply.Content</p>
+                                </div>
+                            }
+                        }
+                    </div>
+
+                    <EditForm Model="newReply" OnValidSubmit="ReplyAsync">
+                        <div class="composer-card nested">
+                            <h3>Reply</h3>
+                            <div class="field-group">
+                                <label>Your name</label>
+                                <InputText @bind-Value="newReply.Author" />
+                            </div>
+                            <div class="field-group">
+                                <label>Reply</label>
+                                <InputTextArea @bind-Value="newReply.Content" rows="4" />
+                            </div>
+                            <label class="checkbox-row">
+                                <InputCheckbox @bind-Value="newReply.IsAnonymous" />
+                                Reply anonymously
+                            </label>
+                            <button class="primary-button" type="submit">Send reply</button>
+                        </div>
+                    </EditForm>
+                </div>
+            }
+        </aside>
+    </div>
+</div>
+
+@code {
+    private readonly List<ForumThread> allThreads = new();
+    private readonly List<string> categories = new();
+    private List<ForumThread> filteredThreads = new();
+    private ForumThread? selectedThread;
+    private string selectedCategory = "All";
+    private bool showComposer;
+    private readonly CreateForumThreadRequest newThread = new() { Category = "General", Author = "Guest" };
+    private readonly CreateForumReplyRequest newReply = new() { Author = "Guest" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadForumAsync();
+    }
+
+    private async Task LoadForumAsync()
+    {
+        try
+        {
+            var categoriesResponse = await Http.GetFromJsonAsync<string[]>("api/forum/categories");
+            if (categoriesResponse is not null)
+            {
+                categories.Clear();
+                categories.AddRange(categoriesResponse);
+            }
+
+            var threads = await Http.GetFromJsonAsync<List<ForumThread>>("api/forum/threads");
+            if (threads is not null)
+            {
+                allThreads.Clear();
+                allThreads.AddRange(threads);
+                FilterByCategory(selectedCategory);
+                selectedThread ??= allThreads.FirstOrDefault();
+            }
+        }
+        catch
+        {
+            categories.Clear();
+            categories.AddRange(ForumCategories.All);
+
+            var sampleThread = new ForumThread
+            {
+                Id = 1,
+                Title = "How are you handling academic stress this semester?",
+                Category = "Academic Pressure",
+                Author = "Student Support",
+                Content = "I am trying to balance assignments, deadlines, and rest. What has helped you feel more in control when the workload feels overwhelming?",
+                CreatedAt = DateTime.UtcNow.AddDays(-2),
+                Replies =
+                [
+                    new ForumReply
+                    {
+                        Id = 1,
+                        ThreadId = 1,
+                        Author = "Maya",
+                        Content = "I started using a simple daily plan and blocking off one low-pressure hour each day.",
+                        CreatedAt = DateTime.UtcNow.AddDays(-1)
+                    }
+                ]
+            };
+
+            allThreads.Clear();
+            allThreads.Add(sampleThread);
+            selectedThread = sampleThread;
+            FilterByCategory("All");
+        }
+    }
+
+    private void ToggleComposer()
+    {
+        showComposer = !showComposer;
+    }
+
+    private void FilterByCategory(string category)
+    {
+        selectedCategory = category;
+        filteredThreads = string.Equals(category, "All", StringComparison.OrdinalIgnoreCase)
+            ? allThreads.ToList()
+            : allThreads.Where(t => t.Category == category).ToList();
+
+        if (selectedThread is null || !filteredThreads.Any(t => t.Id == selectedThread.Id))
+        {
+            selectedThread = filteredThreads.FirstOrDefault();
+        }
+    }
+
+    private void SelectThread(ForumThread thread)
+    {
+        selectedThread = thread;
+    }
+
+    private async Task CreateThreadAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newThread.Title) || string.IsNullOrWhiteSpace(newThread.Content))
+        {
+            return;
+        }
+
+        var response = await Http.PostAsJsonAsync("api/forum/threads", newThread);
+        if (response.IsSuccessStatusCode)
+        {
+            newThread.Title = string.Empty;
+            newThread.Content = string.Empty;
+            newThread.Author = "Guest";
+            newThread.IsAnonymous = false;
+            showComposer = false;
+            await LoadForumAsync();
+        }
+    }
+
+    private async Task ReplyAsync()
+    {
+        if (selectedThread is null || string.IsNullOrWhiteSpace(newReply.Content))
+        {
+            return;
+        }
+
+        newReply.ThreadId = selectedThread.Id;
+        var response = await Http.PostAsJsonAsync($"api/forum/threads/{selectedThread.Id}/replies", newReply);
+        if (response.IsSuccessStatusCode)
+        {
+            newReply.Content = string.Empty;
+            newReply.Author = "Guest";
+            newReply.IsAnonymous = false;
+            await LoadForumAsync();
+        }
+    }
+}
+
+<style>
+    .forum-shell {
+        padding: 2rem;
+        font-family: "Segoe UI", sans-serif;
+        color: #1f2937;
+    }
+
+    .forum-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .eyebrow {
+        margin: 0 0 0.25rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #6b7280;
+        font-size: 0.75rem;
+    }
+
+    h1, h2, h3, p {
+        margin-top: 0;
+    }
+
+    .primary-button,
+    .secondary-button,
+    .category-pill {
+        border: none;
+        border-radius: 999px;
+        padding: 0.7rem 1.1rem;
+        cursor: pointer;
+        font-weight: 600;
+    }
+
+    .primary-button {
+        background: linear-gradient(135deg, #6d5efc, #8b5cf6);
+        color: white;
+    }
+
+    .secondary-button {
+        background: #e5e7eb;
+        color: #1f2937;
+    }
+
+    .category-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .category-pill {
+        background: #f3f4f6;
+        color: #374151;
+    }
+
+    .category-pill.active {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .forum-layout {
+        display: grid;
+        grid-template-columns: minmax(280px, 1.1fr) minmax(320px, 1.4fr);
+        gap: 1.5rem;
+        align-items: start;
+    }
+
+    .thread-list,
+    .thread-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .thread-card,
+    .thread-panel-card,
+    .composer-card,
+    .empty-state {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 1.1rem;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+    }
+
+    .thread-card.selected {
+        border-color: #8b5cf6;
+        background: #f5f3ff;
+    }
+
+    .thread-meta,
+    .thread-footer,
+    .reply-header,
+    .button-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.75rem;
+        align-items: center;
+    }
+
+    .thread-meta {
+        margin-bottom: 0.75rem;
+        font-size: 0.8rem;
+        color: #6b7280;
+    }
+
+    .badge {
+        background: #ecfeff;
+        color: #0f766e;
+        border-radius: 999px;
+        padding: 0.25rem 0.65rem;
+        font-weight: 700;
+    }
+
+    .field-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .field-group {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 1rem;
+    }
+
+    .field-group label {
+        margin-bottom: 0.35rem;
+        font-weight: 600;
+    }
+
+    input, select, textarea {
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        padding: 0.7rem 0.8rem;
+        background: white;
+        width: 100%;
+        font: inherit;
+    }
+
+    textarea {
+        resize: vertical;
+        min-height: 120px;
+    }
+
+    .checkbox-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin-bottom: 1rem;
+        font-weight: 600;
+    }
+
+    .reply-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+        margin: 1.25rem 0;
+    }
+
+    .reply-item {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 0.8rem 0.9rem;
+    }
+
+    .muted {
+        color: #6b7280;
+    }
+
+    .nested {
+        margin-top: 1rem;
+    }
+
+    @@media (max-width: 900px) {
+        .forum-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .forum-header,
+        .field-row,
+        .thread-meta,
+        .thread-footer,
+        .button-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+    }
+</style>
