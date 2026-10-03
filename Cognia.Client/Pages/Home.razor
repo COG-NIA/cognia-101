@@ -1,7 +1,206 @@
 ﻿@page "/"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Cognia | Home</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="dashboard-shell">
+    <section class="hero-panel">
+        <div>
+            <p class="eyebrow">Mental wellness support</p>
+            <h1>Welcome back, Maya.</h1>
+            <p class="lead">Track your mood, access calming tools, and stay connected to a supportive community.</p>
+        </div>
+        <div class="cta-row">
+            <NavLink class="primary-button" href="mood-tracker">Log your mood</NavLink>
+            <NavLink class="secondary-button" href="self-help">Explore resources</NavLink>
+        </div>
+    </section>
 
-Welcome to your new app.
+    <section class="stats-grid" aria-label="Wellness overview">
+        <article class="stat-card">
+            <span class="stat-label">Current mood</span>
+            <strong class="stat-value">Calm</strong>
+            <small>Steady progress this week</small>
+        </article>
+        <article class="stat-card">
+            <span class="stat-label">Check-ins</span>
+            <strong class="stat-value">5/7</strong>
+            <small>Consistency is improving</small>
+        </article>
+        <article class="stat-card">
+            <span class="stat-label">Support tools</span>
+            <strong class="stat-value">12</strong>
+            <small>Helpful resources ready</small>
+        </article>
+    </section>
+
+    <section class="feature-grid">
+        <article class="feature-card">
+            <span class="feature-icon" aria-hidden="true">🌤️</span>
+            <h2>Mood tracker</h2>
+            <p>Reflect on your emotional patterns and notice what supports your wellbeing.</p>
+            <NavLink href="mood-tracker">Open tracker</NavLink>
+        </article>
+
+        <article class="feature-card">
+            <span class="feature-icon" aria-hidden="true">📘</span>
+            <h2>Self-Help Hub</h2>
+            <p>Read practical strategies for managing stress, sleep, focus, and everyday resilience.</p>
+            <NavLink href="self-help">Browse articles</NavLink>
+        </article>
+
+        <article class="feature-card">
+            <span class="feature-icon" aria-hidden="true">💬</span>
+            <h2>Safe Space Forum</h2>
+            <p>Speak openly in a moderated, compassionate space built around community encouragement.</p>
+            <NavLink href="forum">Join discussion</NavLink>
+        </article>
+    </section>
+</div>
+
+<style>
+    .dashboard-shell {
+        padding: 2rem;
+        color: #1f2937;
+    }
+
+    .hero-panel {
+        display: flex;
+        justify-content: space-between;
+        gap: 1.5rem;
+        align-items: center;
+        background: linear-gradient(135deg, #eef2ff 0%, #ecfeff 100%);
+        border: 1px solid #dbeafe;
+        border-radius: 24px;
+        padding: 2rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .eyebrow {
+        margin: 0 0 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #4338ca;
+    }
+
+    h1 {
+        margin: 0;
+        font-size: clamp(2rem, 3vw, 3rem);
+    }
+
+    .lead {
+        margin: 0.75rem 0 0;
+        max-width: 38rem;
+        color: #4b5563;
+        font-size: 1.05rem;
+    }
+
+    .cta-row {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .primary-button,
+    .secondary-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        padding: 0.8rem 1.1rem;
+        text-decoration: none;
+        font-weight: 700;
+        transition: transform 0.15s ease;
+    }
+
+    .primary-button {
+        background: linear-gradient(135deg, #6d5efc, #8b5cf6);
+        color: #fff;
+    }
+
+    .secondary-button {
+        background: #fff;
+        border: 1px solid #d1d5db;
+        color: #1f2937;
+    }
+
+    .stats-grid,
+    .feature-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .stat-card,
+    .feature-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 18px;
+        padding: 1.25rem;
+        box-shadow: 0 10px 25px rgba(17, 24, 39, 0.04);
+    }
+
+    .stat-card {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .stat-label {
+        color: #6b7280;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        color: #111827;
+    }
+
+    .feature-card {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+    }
+
+    .feature-card h2 {
+        margin: 0;
+    }
+
+    .feature-card p {
+        margin: 0;
+        color: #4b5563;
+        line-height: 1.6;
+    }
+
+    .feature-card a {
+        margin-top: auto;
+        color: #4f46e5;
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .feature-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: #f5f3ff;
+        font-size: 1.6rem;
+    }
+
+    @@media (max-width: 640px) {
+        .dashboard-shell {
+            padding: 1rem;
+        }
+
+        .hero-panel {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+</style>

@@ -1,0 +1,138 @@
+@page "/self-help"
+
+<PageTitle>Cognia | Self-Help Hub</PageTitle>
+
+<div class="selfhelp-shell">
+    <header class="page-header">
+        <div>
+            <p class="eyebrow">Support resources</p>
+            <h1>Self-Help Hub</h1>
+        </div>
+    </header>
+
+    <section class="quick-steps" aria-label="Quick wellbeing actions">
+        <article class="step-card">
+            <span aria-hidden="true">🧘</span>
+            <h2>Breathing break</h2>
+            <p>Try a 5-minute breathing exercise to slow your thoughts and reset focus.</p>
+        </article>
+        <article class="step-card">
+            <span aria-hidden="true">📵</span>
+            <h2>Digital detox</h2>
+            <p>Take one low-stimulation hour to reduce overwhelm and support better rest.</p>
+        </article>
+        <article class="step-card">
+            <span aria-hidden="true">📝</span>
+            <h2>Reflection note</h2>
+            <p>Write down one trigger, one strength, and one next step to regain balance.</p>
+        </article>
+    </section>
+
+    <section class="articles-grid">
+        <article class="article-card">
+            <span class="tag">Stress</span>
+            <h2>Managing academic pressure</h2>
+            <p>Practical strategies for reducing overwhelm, protecting your energy, and focusing on what matters most.</p>
+            <button class="link-button" type="button">Read article</button>
+        </article>
+
+        <article class="article-card">
+            <span class="tag">Sleep</span>
+            <h2>Building a calmer bedtime routine</h2>
+            <p>Create a healthier evening rhythm that helps your mind and body settle before sleep.</p>
+            <button class="link-button" type="button">Read article</button>
+        </article>
+
+        <article class="article-card">
+            <span class="tag">Focus</span>
+            <h2>Small steps for emotional regulation</h2>
+            <p>Simple daily practices to respond to stressful moments with more patience and clarity.</p>
+            <button class="link-button" type="button">Read article</button>
+        </article>
+    </section>
+</div>
+
+<style>
+    .selfhelp-shell {
+        padding: 2rem;
+        color: #1f2937;
+    }
+
+    .page-header {
+        margin-bottom: 1.5rem;
+    }
+
+    .eyebrow {
+        margin: 0 0 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #0f766e;
+    }
+
+    h1, h2, p {
+        margin-top: 0;
+    }
+
+    .quick-steps,
+    .articles-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .step-card,
+    .article-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 20px;
+        padding: 1.25rem;
+        box-shadow: 0 10px 25px rgba(17, 24, 39, 0.03);
+    }
+
+    .step-card span {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        background: #ecfeff;
+        font-size: 1.7rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .tag {
+        display: inline-block;
+        background: #ecfeff;
+        color: #0f766e;
+        font-size: 0.75rem;
+        font-weight: 700;
+        border-radius: 999px;
+        padding: 0.35rem 0.7rem;
+        margin-bottom: 0.7rem;
+    }
+
+    .link-button {
+        margin-top: 0.9rem;
+        border: none;
+        background: transparent;
+        color: #4f46e5;
+        font-weight: 700;
+        cursor: pointer;
+        padding: 0;
+    }
+
+    .article-card p,
+    .step-card p {
+        color: #4b5563;
+        line-height: 1.6;
+    }
+
+    @@media (max-width: 640px) {
+        .selfhelp-shell {
+            padding: 1rem;
+        }
+    }
+</style>
