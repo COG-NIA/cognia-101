@@ -1,0 +1,382 @@
+@page "/therapists"
+@using Cognia.Shared.Models
+@using Cognia.Client.Services
+@inject PaymentBookingService BookingService
+@inject NavigationManager NavManager
+
+<PageTitle>Therapist Profiles & Consultations | Cognia</PageTitle>
+
+<div class="dashboard" id="therapist-directory">
+    <main>
+        <section class="welcome-band" aria-labelledby="therapists-heading">
+            <div class="welcome-copy">
+                <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> PROFESSIONAL CARE & EMBEDDED SUPPORT</p>
+                <h1 id="therapists-heading">Connect with verified<br /><em>counselors & specialists.</em></h1>
+                <p class="welcome-lede">Browse qualified mental health professionals, compare specializations, and book confidential 1-on-1 consultations tailored to your wellbeing.</p>
+                <a class="text-link" href="/payment-history">View my booked sessions & payments <span aria-hidden="true">→</span></a>
+            </div>
+        </section>
+
+        <div class="content-wrap">
+            <!-- Crisis Safety Banner -->
+            <div class="crisis-banner">
+                <span>🆘 <strong>Need urgent help?</strong> If you or someone you know is in crisis, call the Ghana Mental Health Helpline: <strong>0800 678 678</strong> (Free 24/7 Support).</span>
+            </div>
+
+            <section class="directory-section">
+                <!-- Search & Advanced Filters Bar -->
+                <div class="filter-controls">
+                    <div class="search-sort-row">
+                        <div class="search-input-wrap">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" class="search-input" placeholder="Search by name, topic (e.g. Anxiety, Stress, Sarah, Wilson)..." @bind="searchTerm" @bind:event="oninput" />
+                        </div>
+
+                        <div class="sort-select-wrap">
+                            <label for="sortBy" class="sort-label">Sort by:</label>
+                            <select id="sortBy" class="sort-select" @bind="sortBy">
+                                <option value="rating">Highest Rated</option>
+                                <option value="price_low">Price: Low to High</option>
+                                <option value="price_high">Price: High to Low</option>
+                                <option value="reviews">Most Reviewed</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Category Pills -->
+                    <div class="filter-pills" role="tablist" aria-label="Specialization categories">
+                        <button type="button" class="pill @(selectedCategory == null ? "active" : "")" @onclick="() => FilterCategory(null)">
+                            All Specialists (@therapists.Count)
+                        </button>
+                        @foreach (var cat in Categories)
+                        {
+                            var count = therapists.Count(t => t.Specialization.Equals(cat, StringComparison.OrdinalIgnoreCase));
+                            <button type="button" class="pill @(selectedCategory == cat ? "active" : "")" @onclick="() => FilterCategory(cat)">
+                                @cat (@count)
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                @if (isLoading)
+                {
+                    <div class="loading-state">
+                        <p>Loading verified therapist directory...</p>
+                    </div>
+                }
+                else if (!FilteredAndSortedTherapists.Any())
+                {
+                    <div class="empty-state">
+                        <p>No specialists match your search criteria.</p>
+                        <button class="action-btn secondary" @onclick="ClearFilters">Clear All Filters</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="therapist-grid">
+                        @foreach (var therapist in FilteredAndSortedTherapists)
+                        {
+                            <article class="therapist-card">
+                                <div class="card-header">
+                                    <div class="avatar-wrap">
+                                        @if (!string.IsNullOrEmpty(therapist.ImageUrl))
+                                        {
+                                            <img src="@therapist.ImageUrl" alt="@therapist.Name" class="avatar-img" />
+                                        }
+                                        else
+                                        {
+                                            <div class="avatar-monogram @GetBgColorClass(therapist.Id)">
+                                                @GetInitials(therapist.Name)
+                                            </div>
+                                        }
+                                        @if (therapist.IsVerified)
+                                        {
+                                            <span class="verified-badge" title="Verified Professional">✓ Verified</span>
+                                        }
+                                    </div>
+                                    <div class="therapist-meta">
+                                        <h3>@therapist.Name</h3>
+                                        <p class="title-label">@therapist.Title</p>
+                                        <div class="rating-strip">
+                                            <span class="stars">★ @therapist.Rating.ToString("F1")</span>
+                                            <span class="reviews">(@therapist.ReviewCount reviews)</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card-body">
+                                    <span class="spec-tag">@therapist.Specialization</span>
+                                    <p class="bio-text">@therapist.Bio</p>
+
+                                    <div class="details-mini-list">
+                                        <div class="mini-detail">
+                                            <span class="detail-label">🎓 Education:</span>
+                                            <span class="detail-val">@therapist.Education</span>
+                                        </div>
+                                        <div class="mini-detail">
+                                            <span class="detail-label">🗣️ Languages:</span>
+                                            <span class="detail-val">@string.Join(", ", therapist.Languages)</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="availability-info">
+                                        <p class="avail-title">Available Days:</p>
+                                        <div class="days-list">
+                                            @foreach (var day in therapist.AvailableDays)
+                                            {
+                                                <span class="day-chip">@day</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card-footer">
+                                    <div class="rate-box">
+                                        <span class="rate-amount">GH₵ @therapist.HourlyRate.ToString("F2")</span>
+                                        <span class="rate-unit">/ 60-min session</span>
+                                    </div>
+                                    <button class="action-btn primary" @onclick="() => BookTherapist(therapist.Id)">
+                                        Book Consultation
+                                    </button>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                }
+            </section>
+        </div>
+    </main>
+</div>
+
+<!-- Detailed Therapist Profile Modal -->
+@if (activeModalTherapist != null)
+{
+    <div class="modal-backdrop" @onclick="CloseProfileModal">
+        <div class="modal-card" @onclick:stopPropagation>
+            <button class="modal-close-btn" @onclick="CloseProfileModal">✕</button>
+
+            <div class="modal-header">
+                <div class="avatar-monogram @GetBgColorClass(activeModalTherapist.Id)" style="width:72px; height:72px; font-size:1.6rem;">
+                    @GetInitials(activeModalTherapist.Name)
+                </div>
+                <div>
+                    <h2>@activeModalTherapist.Name</h2>
+                    <p class="modal-title">@activeModalTherapist.Title</p>
+                    <span class="spec-tag">@activeModalTherapist.Specialization</span>
+                </div>
+            </div>
+
+            <div class="modal-content">
+                <div class="modal-section">
+                    <h4>About & Care Philosophy</h4>
+                    <p>@activeModalTherapist.Bio</p>
+                </div>
+
+                <div class="modal-section">
+                    <h4>Therapeutic Approach</h4>
+                    <p>@activeModalTherapist.Approach</p>
+                </div>
+
+                <div class="modal-grid">
+                    <div>
+                        <strong>Qualifications</strong>
+                        <p style="margin:4px 0 0 0; color:#4a5568;">@activeModalTherapist.Education</p>
+                    </div>
+                    <div>
+                        <strong>Languages Spoken</strong>
+                        <p style="margin:4px 0 0 0; color:#4a5568;">@string.Join(", ", activeModalTherapist.Languages)</p>
+                    </div>
+                    <div>
+                        <strong>Experience</strong>
+                        <p style="margin:4px 0 0 0; color:#4a5568;">@activeModalTherapist.YearsExperience+ Years Clinical Practice</p>
+                    </div>
+                    <div>
+                        <strong>Consultation Rate</strong>
+                        <p style="margin:4px 0 0 0; color:#2b6cb0; font-weight:800;">GH₵ @activeModalTherapist.HourlyRate.ToString("F2") / hour</p>
+                    </div>
+                </div>
+
+                <div class="modal-section" style="margin-top:1.25rem;">
+                    <h4>Standard Time Slots</h4>
+                    <div class="days-list">
+                        @foreach (var slot in activeModalTherapist.TimeSlots)
+                        {
+                            <span class="day-chip" style="background:#ebf8ff; color:#2b6cb0; font-weight:700;">🕒 @slot</span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="action-btn secondary" @onclick="CloseProfileModal">Close</button>
+                <button class="action-btn primary" @onclick="() => { CloseProfileModal(); BookTherapist(activeModalTherapist.Id); }">
+                    Book Session with @activeModalTherapist.Name
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .crisis-banner { background: #fff5f5; border: 1px solid #feb2b2; color: #9b2c2c; padding: 0.85rem 1.25rem; border-radius: 12px; font-size: 0.88rem; margin-top: 1rem; }
+    .directory-section { margin-top: 1.5rem; }
+    .filter-controls { display: flex; flex-direction: column; gap: 1.25rem; margin-bottom: 2rem; }
+
+    .search-sort-row { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    .search-input-wrap { position: relative; flex: 1; min-width: 280px; }
+    .search-input { width: 100%; padding: 0.8rem 1rem 0.8rem 2.5rem; border-radius: 12px; border: 1px solid #cbd5e0; font-size: 0.95rem; box-sizing: border-box; }
+    .search-icon { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: #a0aec0; }
+
+    .sort-select-wrap { display: flex; align-items: center; gap: 0.5rem; }
+    .sort-label { font-size: 0.88rem; font-weight: 700; color: #4a5568; white-space: nowrap; }
+    .sort-select { padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid #cbd5e0; font-size: 0.9rem; font-weight: 600; color: #2d3748; background: white; cursor: pointer; }
+
+    .filter-pills { display: flex; gap: 0.65rem; flex-wrap: wrap; }
+    .pill { background: rgba(255,255,255,0.7); border: 1px solid #dcdfe4; border-radius: 999px; padding: 0.5rem 1.1rem; font-size: 0.85rem; font-weight: 600; color: #4a5568; cursor: pointer; transition: all 0.2s ease; }
+    .pill.active, .pill:hover { background: #2b6cb0; color: #ffffff; border-color: #2b6cb0; box-shadow: 0 4px 12px rgba(43,108,176,0.25); }
+
+    .therapist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.75rem; }
+    .therapist-card { background: #ffffff; border-radius: 18px; border: 1px solid #e2e8f0; padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 15px rgba(0,0,0,0.03); transition: transform 0.25s ease, box-shadow 0.25s ease; }
+    .therapist-card:hover { transform: translateY(-6px); box-shadow: 0 16px 32px rgba(0,0,0,0.08); border-color: #bee3f8; }
+
+    .card-header { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+    .avatar-wrap { position: relative; width: 64px; height: 64px; flex-shrink: 0; }
+    .avatar-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 2px solid #ebf8ff; }
+    
+    .avatar-monogram { width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white; font-size: 1.3rem; }
+    .bg-blue { background: linear-gradient(135deg, #2b6cb0, #4299e1); }
+    .bg-teal { background: linear-gradient(135deg, #2c7a7b, #319795); }
+    .bg-purple { background: linear-gradient(135deg, #6b46c1, #805ad5); }
+    .bg-indigo { background: linear-gradient(135deg, #4c51bf, #667eea); }
+
+    .verified-badge { position: absolute; bottom: -4px; right: -4px; background: #319795; color: white; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; font-weight: 700; }
+
+    .therapist-meta h3 { margin: 0; font-size: 1.15rem; color: #1a202c; font-weight: 700; }
+    .title-label { margin: 2px 0 4px 0; font-size: 0.82rem; color: #718096; }
+    .rating-strip { display: flex; gap: 0.35rem; font-size: 0.85rem; font-weight: 600; color: #d69e2e; }
+    .reviews { color: #a0aec0; font-weight: 400; }
+
+    .spec-tag { display: inline-block; background: #ebf8ff; color: #2b6cb0; font-size: 0.8rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; margin-bottom: 0.75rem; }
+    .bio-text { font-size: 0.88rem; color: #4a5568; line-height: 1.5; margin-bottom: 0.85rem; }
+    
+    .details-mini-list { background: #f8fafc; border-radius: 8px; padding: 0.6rem 0.75rem; font-size: 0.78rem; margin-bottom: 0.85rem; }
+    .mini-detail { display: flex; justify-content: space-between; gap: 0.5rem; margin-bottom: 2px; }
+    .detail-label { color: #718096; font-weight: 600; }
+    .detail-val { color: #2d3748; font-weight: 700; text-align: right; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 190px; }
+
+    .availability-info { font-size: 0.8rem; margin-bottom: 1rem; }
+    .avail-title { color: #718096; margin-bottom: 4px; font-weight: 600; }
+    .days-list { display: flex; gap: 4px; flex-wrap: wrap; }
+    .day-chip { background: #f7fafc; border: 1px solid #edf2f7; color: #4a5568; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
+
+    .card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #edf2f7; pt: 1rem; margin-top: 1rem; }
+    .rate-amount { font-size: 1.15rem; font-weight: 800; color: #2d3748; display: block; }
+    .rate-unit { font-size: 0.75rem; color: #a0aec0; }
+    
+    .btn-group { display: flex; gap: 0.5rem; }
+    .action-btn { padding: 0.65rem 1rem; border-radius: 10px; font-weight: 700; cursor: pointer; border: none; transition: background 0.2s ease; }
+    .action-btn.primary { background: #2b6cb0; color: white; }
+    .action-btn.primary:hover { background: #2c5282; }
+    .action-btn.secondary-sm { background: #edf2f7; color: #4a5568; font-size: 0.82rem; }
+    .action-btn.secondary-sm:hover { background: #e2e8f0; }
+
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1.5rem; }
+    .modal-card { background: white; border-radius: 20px; max-width: 540px; width: 100%; padding: 2rem; position: relative; box-shadow: 0 20px 40px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
+    .modal-close-btn { position: absolute; right: 1.5rem; top: 1.5rem; border: none; background: #f1f5f9; width: 32px; height: 32px; border-radius: 50%; font-weight: bold; cursor: pointer; }
+    .modal-header { display: flex; gap: 1.25rem; align-items: center; margin-bottom: 1.5rem; }
+    .modal-title { color: #64748b; margin: 2px 0 6px 0; font-size: 0.9rem; }
+    .modal-section { margin-top: 1rem; font-size: 0.9rem; color: #4a5568; line-height: 1.5; }
+    .modal-section h4 { margin: 0 0 0.35rem 0; color: #0f172a; font-size: 0.95rem; font-weight: 800; }
+    .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; background: #f8fafc; padding: 1rem; border-radius: 12px; margin-top: 1rem; font-size: 0.85rem; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.75rem; border-top: 1px solid #e2e8f0; padding-top: 1rem; }
+
+    .loading-state, .empty-state { text-align: center; padding: 3rem; background: white; border-radius: 16px; }
+</style>
+
+@code {
+    private List<Therapist> therapists = new();
+    private bool isLoading = true;
+    private string? selectedCategory;
+    private string searchTerm = string.Empty;
+    private string sortBy = "rating";
+    private Therapist? activeModalTherapist;
+
+    private readonly string[] Categories = new[]
+    {
+        "Anxiety & Depression",
+        "Academic & Career Pressure",
+        "Trauma & Emotional Resilience",
+        "Relationships & Self-Care",
+        "Stress & Burnout",
+        "Grief & Coping"
+    };
+
+    private IEnumerable<Therapist> FilteredAndSortedTherapists
+    {
+        get
+        {
+            var result = therapists.Where(t => 
+                (string.IsNullOrWhiteSpace(searchTerm) || 
+                 t.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || 
+                 t.Specialization.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || 
+                 t.Bio.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)));
+
+            return sortBy switch
+            {
+                "price_low" => result.OrderBy(t => t.HourlyRate),
+                "price_high" => result.OrderByDescending(t => t.HourlyRate),
+                "reviews" => result.OrderByDescending(t => t.ReviewCount),
+                _ => result.OrderByDescending(t => t.Rating)
+            };
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTherapists();
+    }
+
+    private async Task LoadTherapists()
+    {
+        isLoading = true;
+        therapists = await BookingService.GetTherapistsAsync(selectedCategory);
+        isLoading = false;
+    }
+
+    private async Task FilterCategory(string? cat)
+    {
+        selectedCategory = cat;
+        await LoadTherapists();
+    }
+
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        selectedCategory = null;
+        sortBy = "rating";
+    }
+
+    private void OpenProfileModal(Therapist t) => activeModalTherapist = t;
+    private void CloseProfileModal() => activeModalTherapist = null;
+
+    private void BookTherapist(int id)
+    {
+        NavManager.NavigateTo($"/book-session/{id}");
+    }
+
+    private string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "TH";
+        var parts = name.Replace("Dr. ", "").Replace(", Ph.D.", "").Replace(", M.Sc.", "").Replace(", MA", "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2) return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+        return parts[0][..Math.Min(2, parts[0].Length)].ToUpper();
+    }
+
+    private string GetBgColorClass(int id) => (id % 4) switch
+    {
+        1 => "bg-blue",
+        2 => "bg-teal",
+        3 => "bg-purple",
+        _ => "bg-indigo"
+    };
+}

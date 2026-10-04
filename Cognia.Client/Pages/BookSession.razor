@@ -1,0 +1,493 @@
+@page "/book-session/{TherapistId:int}"
+@using Cognia.Shared.Models
+@using Cognia.Client.Services
+@inject PaymentBookingService BookingService
+@inject NavigationManager NavManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Book 1-on-1 Therapy Consultation | Cognia</PageTitle>
+
+<div class="dashboard" id="booking-page">
+    <main>
+        <section class="welcome-band">
+            <div class="welcome-copy">
+                <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> CONFIDENTIAL & EMBEDDED THERAPY CARE</p>
+                <h1>Schedule your <em>1-on-1 consultation.</em></h1>
+                <p class="welcome-lede">Select your preferred session mode, pick a duration, choose a date & time slot, and confirm your private session securely.</p>
+                <a href="/therapists" class="back-btn" style="margin-top:0.75rem;">← Specialists</a>
+            </div>
+        </section>
+
+        <div class="content-wrap">
+            @if (isLoading)
+            {
+                <div class="loading-state">
+                    <p>Loading specialist details and available calendar schedule...</p>
+                </div>
+            }
+            else if (therapist == null)
+            {
+                <div class="error-state">
+                    <p>Therapist profile not found.</p>
+                    <a href="/therapists" class="action-btn secondary">Back to Directory</a>
+                </div>
+            }
+            else
+            {
+                <!-- Emergency Crisis Notice Banner -->
+                <div class="crisis-notice">
+                    <span>🆘 <strong>In Immediate Crisis?</strong> If you are experiencing a mental health emergency, please reach out to the Ghana Mental Health Authority Helpline at <strong>0800 678 678</strong> or visit your nearest medical emergency room.</span>
+                </div>
+
+                <!-- Progress Stepper -->
+                <div class="stepper-bar">
+                    <div class="step-item active"><span class="step-num">1</span> Consultation Options</div>
+                    <div class="step-item active"><span class="step-num">2</span> Date & Time Slot</div>
+                    <div class="step-item active"><span class="step-num">3</span> Therapy Focus & Payment</div>
+                </div>
+
+                <div class="booking-layout">
+                    <!-- Left Column: Comprehensive Registration Form -->
+                    <div class="booking-card form-card">
+                        <div class="card-title-row">
+                            <h2>Session Registration Details</h2>
+                            <span class="confidential-badge">🔒 100% Private & Encrypted</span>
+                        </div>
+                        <p class="form-subtext">All sessions are conducted in private, end-to-end encrypted rooms.</p>
+                        
+                        <form @onsubmit="ProcessBooking" @onsubmit:preventDefault>
+                            
+                            <!-- 1. Session Format Selection -->
+                            <div class="form-group">
+                                <label class="section-label">1. Select Consultation Format</label>
+                                <div class="mode-grid">
+                                    <div class="mode-card @(bookingReq.SessionMode == "Encrypted Video Call" ? "selected" : "")" @onclick='() => SetSessionMode("Encrypted Video Call")'>
+                                        <div class="mode-icon">🎥</div>
+                                        <div class="mode-title">Video Call</div>
+                                        <div class="mode-desc">Face-to-face HD encrypted video via Jitsi</div>
+                                    </div>
+                                    <div class="mode-card @(bookingReq.SessionMode == "Private Audio Call" ? "selected" : "")" @onclick='() => SetSessionMode("Private Audio Call")'>
+                                        <div class="mode-icon">🎙️</div>
+                                        <div class="mode-title">Audio Call</div>
+                                        <div class="mode-desc">Private voice-only consultation</div>
+                                    </div>
+                                    <div class="mode-card @(bookingReq.SessionMode == "Confidential Text Chat" ? "selected" : "")" @onclick='() => SetSessionMode("Confidential Text Chat")'>
+                                        <div class="mode-icon">💬</div>
+                                        <div class="mode-title">Live Chat</div>
+                                        <div class="mode-desc">Real-time confidential structured text</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 2. Session Duration Selection -->
+                            <div class="form-group">
+                                <label class="section-label">2. Select Consultation Duration</label>
+                                <div class="duration-pills">
+                                    <button type="button" class="dur-pill @(bookingReq.DurationMinutes == 30 ? "selected" : "")" @onclick="() => SetDuration(30)">
+                                        ⏱️ 30 Mins <span class="dur-price">(GH₵ @((therapist.HourlyRate * 0.6m).ToString("F2")))</span>
+                                    </button>
+                                    <button type="button" class="dur-pill @(bookingReq.DurationMinutes == 60 ? "selected" : "")" @onclick="() => SetDuration(60)">
+                                        ⏱️ 60 Mins (Standard) <span class="dur-price">(GH₵ @therapist.HourlyRate.ToString("F2"))</span>
+                                    </button>
+                                    <button type="button" class="dur-pill @(bookingReq.DurationMinutes == 90 ? "selected" : "")" @onclick="() => SetDuration(90)">
+                                        ⏱️ 90 Mins (In-Depth) <span class="dur-price">(GH₵ @((therapist.HourlyRate * 1.45m).ToString("F2")))</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- 3. Client Information -->
+                            <div class="form-group">
+                                <label class="section-label">3. Client Contact Information</label>
+                                <div class="form-row">
+                                    <div class="input-field">
+                                        <label for="clientName">Your Full Name *</label>
+                                        <input id="clientName" type="text" class="input-control" @bind="bookingReq.ClientName" placeholder="e.g. Lois Osei-Bonsu" required />
+                                    </div>
+
+                                    <div class="input-field">
+                                        <label for="clientEmail">Email Address (For receipts & Video link) *</label>
+                                        <input id="clientEmail" type="email" class="input-control" @bind="bookingReq.ClientEmail" placeholder="e.g. lois@example.com" required />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 4. Date & Time Selection -->
+                            <div class="form-group">
+                                <label class="section-label">4. Schedule Date & Available Time Slot</label>
+                                <div class="form-row" style="margin-bottom:0.75rem;">
+                                    <div class="input-field">
+                                        <label for="sessionDate">Consultation Date *</label>
+                                        <input id="sessionDate" type="date" class="input-control" @bind="bookingReq.SessionDate" min="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+                                    </div>
+                                    <div class="input-field">
+                                        <label>Therapist Working Days</label>
+                                        <div class="working-days-bar">
+                                            @foreach (var day in therapist.AvailableDays)
+                                            {
+                                                <span class="working-day-chip">✓ @day</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <label style="font-size:0.85rem; color:#4a5568; font-weight:600; margin-bottom:0.4rem; display:block;">Select Time Slot *</label>
+                                <div class="time-chips">
+                                    @foreach (var slot in therapist.TimeSlots)
+                                    {
+                                        <button type="button" class="time-chip @(bookingReq.TimeSlot == slot ? "selected" : "")" @onclick="() => bookingReq.TimeSlot = slot">
+                                            🕒 @slot
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+
+                            <!-- 5. Therapy Focus & Notes -->
+                            <div class="form-group">
+                                <label class="section-label">5. Therapy Goals & Topics of Focus (Optional)</label>
+                                <p style="font-size:0.8rem; color:#718096; margin-bottom:0.5rem;">Click quick tags below to auto-fill or write your own notes for your specialist:</p>
+                                
+                                <div class="focus-tags">
+                                    <button type="button" class="tag-chip" @onclick='() => AddFocusTag("Exam & Academic Stress")'>+ Academic Stress</button>
+                                    <button type="button" class="tag-chip" @onclick='() => AddFocusTag("Anxiety & Panic Attacks")'>+ Anxiety & Panic</button>
+                                    <button type="button" class="tag-chip" @onclick='() => AddFocusTag("Burnout & Fatigue")'>+ Burnout & Fatigue</button>
+                                    <button type="button" class="tag-chip" @onclick='() => AddFocusTag("Relationship Conflict")'>+ Relationship Conflict</button>
+                                    <button type="button" class="tag-chip" @onclick='() => AddFocusTag("Grief & Loss")'>+ Grief & Loss</button>
+                                    <button type="button" class="tag-chip" @onclick='() => AddFocusTag("Self-Esteem & Identity")'>+ Self-Esteem</button>
+                                </div>
+
+                                <textarea id="notes" class="input-control textarea" @bind="bookingReq.Notes" rows="3" placeholder="Share any feelings, background context, or specific goals for your therapist..."></textarea>
+                            </div>
+
+                            <!-- Client Preparation Checklist Accordion -->
+                            <div class="prep-accordion">
+                                <h4>💡 What to expect during your consultation:</h4>
+                                <ul>
+                                    <li>✓ You will receive an instant confirmation email with your encrypted 1-on-1 Jitsi meeting link.</li>
+                                    <li>✓ Ensure you are in a quiet, private environment 5 minutes before your scheduled start time.</li>
+                                    <li>✓ All discussions remain 100% confidential under ethical professional standards.</li>
+                                </ul>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(errorMessage))
+                            {
+                                <div class="alert-box error">@errorMessage</div>
+                            }
+
+                            <button type="submit" class="action-btn pay-btn" disabled="@isSubmitting">
+                                @if (isSubmitting)
+                                {
+                                    <span>Processing Booking & Initializing Paystack...</span>
+                                }
+                                else
+                                {
+                                    <span>Proceed to Pay GH₵ @CalculateTotal().ToString("F2")</span>
+                                }
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Right Column: Professional Summary Sidebar -->
+                    <aside class="booking-card summary-card">
+                        <h3 class="summary-title">Consultation Summary</h3>
+                        
+                        <div class="summary-header">
+                            <div class="avatar-monogram @GetBgColorClass(therapist.Id)">
+                                @GetInitials(therapist.Name)
+                            </div>
+                            <div>
+                                <h3>@therapist.Name</h3>
+                                <p class="sub-title">@therapist.Title</p>
+                                <span class="badge">@therapist.Specialization</span>
+                            </div>
+                        </div>
+
+                        <div class="therapist-specs-list">
+                            <div class="spec-row">
+                                <span class="spec-label">Experience:</span>
+                                <span class="spec-val">@therapist.YearsExperience+ years</span>
+                            </div>
+                            <div class="spec-row">
+                                <span class="spec-label">Languages:</span>
+                                <span class="spec-val">@string.Join(", ", therapist.Languages)</span>
+                            </div>
+                            <div class="spec-row">
+                                <span class="spec-label">Approach:</span>
+                                <span class="spec-val">@therapist.Approach</span>
+                            </div>
+                        </div>
+
+                        <hr class="divider" />
+
+                        <div class="summary-breakdown">
+                            <div class="row">
+                                <span>Format:</span>
+                                <strong>@bookingReq.SessionMode</strong>
+                            </div>
+                            <div class="row">
+                                <span>Duration:</span>
+                                <strong>@bookingReq.DurationMinutes Mins</strong>
+                            </div>
+                            <div class="row">
+                                <span>Date & Time:</span>
+                                <strong>@bookingReq.SessionDate.ToString("MMM d") at @bookingReq.TimeSlot</strong>
+                            </div>
+                            <div class="row">
+                                <span>Consultation Fee:</span>
+                                <span>GH₵ @CalculateTotal().ToString("F2")</span>
+                            </div>
+                            <div class="row">
+                                <span>Encrypted Jitsi Call:</span>
+                                <span class="free-label">Included Free</span>
+                            </div>
+                            <div class="row total-row">
+                                <span>Total Amount:</span>
+                                <span>GH₵ @CalculateTotal().ToString("F2")</span>
+                            </div>
+                        </div>
+
+                        <div class="guarantee-box">
+                            <span class="shield-icon">🛡️</span>
+                            <div>
+                                <strong>100% Satisfaction Guarantee</strong>
+                                <p>If your session is interrupted due to network issues, easily reschedule at no additional cost.</p>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            }
+        </div>
+    </main>
+</div>
+
+<style>
+    .crisis-notice { background: #fff5f5; border: 1px solid #feb2b2; color: #9b2c2c; padding: 0.85rem 1.25rem; border-radius: 12px; font-size: 0.88rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem; }
+    .stepper-bar { display: flex; gap: 1.5rem; margin-bottom: 1.75rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.85rem; }
+    .step-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 700; color: #94a3b8; }
+    .step-item.active { color: #2b6cb0; }
+    .step-num { width: 22px; height: 22px; border-radius: 50%; background: #e2e8f0; color: #64748b; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; }
+    .step-item.active .step-num { background: #2b6cb0; color: white; }
+
+    .booking-layout { display: grid; grid-template-columns: 1fr 370px; gap: 1.75rem; margin-top: 1rem; }
+    @media (max-width: 900px) { .booking-layout { grid-template-columns: 1fr; } }
+
+    .booking-card { background: white; border-radius: 20px; border: 1px solid #e2e8f0; padding: 1.75rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
+    .card-title-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+    .card-title-row h2 { margin: 0; font-size: 1.35rem; color: #1a202c; font-weight: 800; }
+    .confidential-badge { background: #f0fff4; border: 1px solid #b2f5ea; color: #234e52; font-size: 0.78rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
+    .form-subtext { font-size: 0.85rem; color: #718096; margin: 4px 0 1.5rem 0; }
+
+    .section-label { display: block; font-size: 0.95rem; font-weight: 800; color: #2d3748; margin-bottom: 0.75rem; border-bottom: 2px solid #ebf8ff; padding-bottom: 0.25rem; }
+    .form-group { margin-bottom: 1.5rem; }
+
+    .mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem; }
+    @media (max-width: 600px) { .mode-grid { grid-template-columns: 1fr; } }
+    .mode-card { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 1rem; cursor: pointer; transition: all 0.2s ease; text-align: center; }
+    .mode-card:hover { border-color: #90cdf4; background: #ebf8ff; }
+    .mode-card.selected { background: #ebf8ff; border-color: #3182ce; box-shadow: 0 0 0 3px rgba(49,130,206,0.2); }
+    .mode-icon { font-size: 1.6rem; margin-bottom: 0.25rem; }
+    .mode-title { font-weight: 800; font-size: 0.9rem; color: #2d3748; }
+    .mode-desc { font-size: 0.75rem; color: #718096; margin-top: 4px; line-height: 1.3; }
+
+    .duration-pills { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .dur-pill { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 0.65rem 1.1rem; font-size: 0.88rem; font-weight: 700; color: #4a5568; cursor: pointer; transition: all 0.2s ease; }
+    .dur-pill:hover { border-color: #3182ce; background: #ebf8ff; }
+    .dur-pill.selected { background: #2b6cb0; color: white; border-color: #2b6cb0; box-shadow: 0 4px 12px rgba(43,108,176,0.25); }
+    .dur-price { font-size: 0.8rem; font-weight: 600; opacity: 0.9; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
+    .input-field label { display: block; font-size: 0.82rem; font-weight: 700; color: #4a5568; margin-bottom: 0.35rem; }
+    .input-control { width: 100%; padding: 0.75rem 0.9rem; border-radius: 10px; border: 1px solid #cbd5e0; font-size: 0.9rem; font-family: inherit; color: #2d3748; box-sizing: border-box; }
+    .input-control:focus { outline: none; border-color: #3182ce; box-shadow: 0 0 0 3px rgba(49,130,206,0.15); }
+    
+    .working-days-bar { display: flex; gap: 4px; flex-wrap: wrap; padding: 6px 0; }
+    .working-day-chip { background: #e6fffa; border: 1px solid #b2f5ea; color: #234e52; font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
+
+    .time-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 0.6rem; }
+    .time-chip { padding: 0.65rem 0.85rem; border: 1.5px solid #cbd5e0; border-radius: 10px; font-size: 0.85rem; font-weight: 600; color: #4a5568; cursor: pointer; text-align: center; transition: all 0.15s ease; background: white; }
+    .time-chip:hover { border-color: #90cdf4; background: #ebf8ff; }
+    .time-chip.selected { background: #ebf8ff; border-color: #3182ce; color: #2b6cb0; font-weight: 800; box-shadow: 0 0 0 3px rgba(49,130,206,0.2); }
+
+    .focus-tags { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+    .tag-chip { background: #edf2f7; border: 1px solid #e2e8f0; color: #4a5568; border-radius: 999px; padding: 4px 10px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease; }
+    .tag-chip:hover { background: #cbd5e0; color: #1a202c; }
+
+    .textarea { resize: vertical; }
+
+    .prep-accordion { background: #f7fafc; border: 1px solid #edf2f7; border-radius: 12px; padding: 1rem; margin-top: 1rem; font-size: 0.82rem; color: #4a5568; }
+    .prep-accordion h4 { margin: 0 0 0.5rem 0; font-size: 0.88rem; color: #2d3748; font-weight: 700; }
+    .prep-accordion ul { margin: 0; padding-left: 1.2rem; }
+    .prep-accordion li { margin-bottom: 0.35rem; line-height: 1.4; }
+
+    .pay-btn { width: 100%; padding: 1rem; background: #2b6cb0; color: white; border: none; border-radius: 12px; font-size: 1.05rem; font-weight: 800; cursor: pointer; margin-top: 1.25rem; transition: background 0.2s ease; box-shadow: 0 4px 12px rgba(43,108,176,0.2); }
+    .pay-btn:hover { background: #2c5282; }
+    .pay-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+
+    .summary-card { height: fit-content; position: sticky; top: 90px; }
+    .summary-title { margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; color: #1a202c; font-weight: 800; }
+    .summary-header { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+    .avatar-monogram { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white; font-size: 1.2rem; flex-shrink: 0; }
+    .bg-blue { background: linear-gradient(135deg, #2b6cb0, #4299e1); }
+    .bg-teal { background: linear-gradient(135deg, #2c7a7b, #319795); }
+    .bg-purple { background: linear-gradient(135deg, #6b46c1, #805ad5); }
+    .bg-indigo { background: linear-gradient(135deg, #4c51bf, #667eea); }
+
+    .summary-header h3 { margin: 0; font-size: 1.1rem; color: #2d3748; font-weight: 700; }
+    .sub-title { margin: 2px 0 6px 0; font-size: 0.8rem; color: #718096; }
+    .badge { background: #ebf8ff; color: #2b6cb0; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+    .therapist-specs-list { background: #f8fafc; border-radius: 10px; padding: 0.75rem; font-size: 0.8rem; margin-top: 0.75rem; }
+    .spec-row { display: flex; justify-content: space-between; margin-bottom: 0.35rem; }
+    .spec-label { color: #718096; font-weight: 600; }
+    .spec-val { color: #2d3748; font-weight: 700; text-align: right; }
+
+    .divider { border: none; border-top: 1px solid #edf2f7; margin: 1rem 0; }
+    .summary-breakdown .row { display: flex; justify-content: space-between; font-size: 0.85rem; color: #4a5568; margin-bottom: 0.6rem; }
+    .free-label { color: #38a169; font-weight: 700; }
+    .summary-breakdown .total-row { font-size: 1.15rem; font-weight: 800; color: #2d3748; border-top: 1.5px dashed #cbd5e0; padding-top: 0.75rem; margin-top: 0.75rem; }
+
+    .guarantee-box { display: flex; gap: 0.75rem; align-items: flex-start; background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 10px; padding: 0.85rem; margin-top: 1.25rem; font-size: 0.78rem; color: #2b6cb0; }
+    .shield-icon { font-size: 1.3rem; }
+    .guarantee-box p { margin: 2px 0 0 0; color: #4a5568; line-height: 1.3; }
+
+    .alert-box.error { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; padding: 0.75rem; border-radius: 8px; margin-top: 1rem; font-size: 0.9rem; }
+    .loading-state, .error-state { text-align: center; padding: 3rem; background: white; border-radius: 16px; }
+</style>
+
+@code {
+    [Parameter]
+    public int TherapistId { get; set; }
+
+    private Therapist? therapist;
+    private BookSessionRequest bookingReq = new();
+    private bool isLoading = true;
+    private bool isSubmitting = false;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        therapist = await BookingService.GetTherapistByIdAsync(TherapistId);
+        if (therapist != null)
+        {
+            bookingReq.TherapistId = therapist.Id;
+            bookingReq.SessionDate = DateTime.Today.AddDays(1);
+            bookingReq.DurationMinutes = 60;
+            bookingReq.SessionMode = "Encrypted Video Call";
+            if (therapist.TimeSlots.Any())
+            {
+                bookingReq.TimeSlot = therapist.TimeSlots.First();
+            }
+        }
+        isLoading = false;
+    }
+
+    private void SetSessionMode(string mode)
+    {
+        bookingReq.SessionMode = mode;
+    }
+
+    private void SetDuration(int mins)
+    {
+        bookingReq.DurationMinutes = mins;
+    }
+
+    private void AddFocusTag(string tag)
+    {
+        if (string.IsNullOrWhiteSpace(bookingReq.Notes))
+        {
+            bookingReq.Notes = $"Focus topic: {tag}";
+        }
+        else if (!bookingReq.Notes.Contains(tag))
+        {
+            bookingReq.Notes += $", {tag}";
+        }
+    }
+
+    private decimal CalculateTotal()
+    {
+        if (therapist == null) return 150.00m;
+        var factor = bookingReq.DurationMinutes switch
+        {
+            30 => 0.60m,
+            90 => 1.45m,
+            _ => 1.00m
+        };
+        return Math.Round(therapist.HourlyRate * factor, 2);
+    }
+
+    private async Task ProcessBooking()
+    {
+        if (therapist == null) return;
+        isSubmitting = true;
+        errorMessage = null;
+
+        try
+        {
+            var session = await BookingService.BookSessionAsync(bookingReq);
+            if (session == null)
+            {
+                errorMessage = "Failed to create session booking. Please try again.";
+                isSubmitting = false;
+                return;
+            }
+
+            var initReq = new InitializePaymentRequest
+            {
+                SessionId = session.Id,
+                Email = bookingReq.ClientEmail,
+                Amount = CalculateTotal(),
+                CallbackUrl = $"{NavManager.BaseUri}payment-history"
+            };
+
+            var paystackRes = await BookingService.InitializePaymentAsync(initReq);
+            var refCode = paystackRes?.Data?.Reference ?? $"COGNIA-PAY-{Guid.NewGuid().ToString()[..8].ToUpper()}";
+
+            var dotNetRef = DotNetObjectReference.Create(this);
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("paystackInterop.payWithPaystack", "pk_test_cce97442fea16049dd3622d782b3984ad03cd27e", bookingReq.ClientEmail, CalculateTotal(), refCode, dotNetRef);
+            }
+            catch
+            {
+                // Fallback to direct redirect if JS interop fails
+                await BookingService.VerifyPaymentAsync(refCode);
+                NavManager.NavigateTo("/payment-history");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An unexpected error occurred: {ex.Message}";
+            isSubmitting = false;
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnPaymentSuccess(string reference)
+    {
+        await BookingService.VerifyPaymentAsync(reference);
+        NavManager.NavigateTo("/payment-history");
+    }
+
+    [JSInvokable]
+    public void OnPaymentClosed()
+    {
+        isSubmitting = false;
+        StateHasChanged();
+    }
+
+    private string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "TH";
+        var parts = name.Replace("Dr. ", "").Replace(", Ph.D.", "").Replace(", M.Sc.", "").Replace(", MA", "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2) return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+        return parts[0][..Math.Min(2, parts[0].Length)].ToUpper();
+    }
+
+    private string GetBgColorClass(int id) => (id % 4) switch
+    {
+        1 => "bg-blue",
+        2 => "bg-teal",
+        3 => "bg-purple",
+        _ => "bg-indigo"
+    };
+}

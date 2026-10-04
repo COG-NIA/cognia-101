@@ -1,0 +1,347 @@
+@page "/payment-history"
+@using Cognia.Shared.Models
+@using Cognia.Client.Services
+@inject PaymentBookingService BookingService
+
+<PageTitle>My Sessions & Paystack Receipts | Cognia</PageTitle>
+
+<div class="dashboard" id="history-page">
+    <main>
+        <section class="welcome-band">
+            <div class="welcome-copy">
+                <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> CONFIDENTIAL CLIENT DASHBOARD</p>
+                <h1>My Sessions & <em>Receipts.</em></h1>
+                <p class="welcome-lede">Manage scheduled consultations, launch private 1-on-1 Jitsi video calls, download Paystack receipts, and view payment transaction history.</p>
+                <a href="/therapists" class="back-btn" style="margin-top:0.75rem;">← Specialists</a>
+            </div>
+        </section>
+
+        <div class="content-wrap">
+            <!-- Feature 1: Therapy Care Stats Overview Bar -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🩺</div>
+                    <div>
+                        <div class="stat-val">@sessions.Count(s => s.Status == "Confirmed")</div>
+                        <div class="stat-label">Confirmed Sessions</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⏱️</div>
+                    <div>
+                        <div class="stat-val">@((sessions.Sum(s => s.DurationMinutes) / 60.0).ToString("F1")) hrs</div>
+                        <div class="stat-label">Total Care Hours</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">💳</div>
+                    <div>
+                        <div class="stat-val">GH₵ @(payments.Sum(p => p.Amount).ToString("F2"))</div>
+                        <div class="stat-label">Total Investment</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🔒</div>
+                    <div>
+                        <div class="stat-val">100% Encrypted</div>
+                        <div class="stat-label">Privacy Guarantee</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature 2: Pre-Session Preparation & Tech Check Card -->
+            @if (sessions.Any(s => s.Status == "Confirmed"))
+            {
+                <div class="prep-checklist-card">
+                    <div class="checklist-header">
+                        <span class="chk-icon">💡</span>
+                        <div>
+                            <h4>Pre-Session Checklist & Tech Check</h4>
+                            <p>Follow these quick recommendations before joining your 1-on-1 video call:</p>
+                        </div>
+                    </div>
+                    <div class="checklist-items">
+                        <div class="chk-item">✓ <strong>Quiet Environment:</strong> Choose a private space free of interruptions.</div>
+                        <div class="chk-item">✓ <strong>Use Headphones:</strong> Plugs in headphones for maximum audio privacy.</div>
+                        <div class="chk-item">✓ <strong>Join 5 Mins Early:</strong> Connect a few minutes before start time to test mic and camera.</div>
+                    </div>
+                </div>
+            }
+
+            <!-- Section 1: Booked Consultations & Video Room Access -->
+            <section class="history-section">
+                <div class="section-heading-row">
+                    <div>
+                        <p class="eyebrow">1-ON-1 SESSIONS</p>
+                        <h2>Scheduled Therapy Consultations</h2>
+                    </div>
+
+                    <div class="tab-pills">
+                        <button class="tab-pill @(activeTab == "all" ? "active" : "")" @onclick='() => SetTab("all")'>
+                            All Consultations (@sessions.Count)
+                        </button>
+                        <button class="tab-pill @(activeTab == "confirmed" ? "active" : "")" @onclick='() => SetTab("confirmed")'>
+                            Confirmed (@sessions.Count(s => s.Status == "Confirmed"))
+                        </button>
+                    </div>
+                </div>
+
+                @if (isLoading)
+                {
+                    <div class="loading-state"><p>Loading your consultation schedule...</p></div>
+                }
+                else if (!FilteredSessions.Any())
+                {
+                    <div class="empty-state">
+                        <p>No consultations found for this view.</p>
+                        <a href="/therapists" class="action-btn primary">Browse Specialist Directory</a>
+                    </div>
+                }
+                else
+                {
+                    <div class="sessions-list">
+                        @foreach (var session in FilteredSessions)
+                        {
+                            <article class="session-card">
+                                <div class="session-info">
+                                    <div class="therapist-badge">
+                                        <div class="avatar-monogram @GetBgColorClass(session.TherapistId)">
+                                            @GetInitials(session.TherapistName)
+                                        </div>
+                                        <div>
+                                            <h3>@session.TherapistName</h3>
+                                            <p class="session-date">📅 <strong>@session.SessionDate.ToString("dddd, MMMM d, yyyy")</strong> at <strong>@session.TimeSlot</strong> (@session.DurationMinutes Mins)</p>
+                                            <span class="mode-tag">🎥 @session.SessionMode</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-block">
+                                        @if (session.Status == "Confirmed")
+                                        {
+                                            <span class="status-chip confirmed">✓ Confirmed</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="status-chip pending">⏳ @session.Status</span>
+                                        }
+                                        <span class="amount">GH₵ @session.TotalAmount.ToString("F2")</span>
+                                    </div>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(session.Notes))
+                                {
+                                    <div class="notes-box">
+                                        <strong>Consultation Focus:</strong> @session.Notes
+                                    </div>
+                                }
+
+                                <div class="session-footer">
+                                    <div class="ref-info">
+                                        <span>Reference: <code>@(string.IsNullOrEmpty(session.PaymentReference) ? "COGNIA-REF-PENDING" : session.PaymentReference)</code></span>
+                                    </div>
+
+                                    <div class="btn-action-group">
+                                        @if (session.Status == "Confirmed" && !string.IsNullOrEmpty(session.MeetingLink))
+                                        {
+                                            <button class="action-btn secondary-sm" @onclick="() => DownloadReceipt(session)">
+                                                📄 Download Receipt
+                                            </button>
+                                            <a href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=Cognia+Therapy+Session+with+@session.TherapistName&details=Private+Confidential+Therapy+Consultation" target="_blank" class="action-btn secondary-sm" style="text-decoration:none;">
+                                                📅 Add to Calendar
+                                            </a>
+                                            <a href="@session.MeetingLink" target="_blank" rel="noopener noreferrer" class="action-btn join-btn">
+                                                🎥 Launch Jitsi Room →
+                                            </a>
+                                        }
+                                        else
+                                        {
+                                            <button class="action-btn secondary" disabled>Awaiting Payment Confirmation</button>
+                                        }
+                                    </div>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                }
+            </section>
+
+            <!-- Section 2: Paystack Transaction Audit Receipts -->
+            <section class="history-section" style="margin-top: 3rem;">
+                <div class="section-heading-row">
+                    <div>
+                        <p class="eyebrow">PAYSTACK TRANSACTION LOG</p>
+                        <h2>Payment Audit & Receipts</h2>
+                    </div>
+                </div>
+
+                @if (!payments.Any())
+                {
+                    <div class="empty-state">
+                        <p>No Paystack transaction records found.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="payment-table">
+                            <thead>
+                                <tr>
+                                    <th>Date & Time</th>
+                                    <th>Payment Reference</th>
+                                    <th>Payment Channel</th>
+                                    <th>Currency & Amount</th>
+                                    <th>Paystack Gateway Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var pay in payments)
+                                {
+                                    <tr>
+                                        <td>@pay.CreatedAt.ToString("MMM d, yyyy HH:mm")</td>
+                                        <td><code>@pay.PaymentReference</code></td>
+                                        <td>
+                                            @if (pay.PaymentChannel.Contains("Mobile", StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <span>📱 Mobile Money</span>
+                                            }
+                                            else
+                                            {
+                                                <span>💳 Card Payment</span>
+                                            }
+                                        </td>
+                                        <td><strong>GH₵ @pay.Amount.ToString("F2")</strong></td>
+                                        <td>
+                                            @if (pay.PaymentStatus == "Success")
+                                            {
+                                                <span class="table-chip success">✓ Paid (Success)</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="table-chip pending">@pay.PaymentStatus</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+        </div>
+    </main>
+</div>
+
+<style>
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 1.75rem; }
+    .stat-card { background: white; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.1rem 1.25rem; display: flex; align-items: center; gap: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+    .stat-icon { font-size: 1.75rem; background: #f1f5f9; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+    .stat-val { font-size: 1.25rem; font-weight: 800; color: #0f172a; }
+    .stat-label { font-size: 0.78rem; font-weight: 600; color: #64748b; }
+
+    .prep-checklist-card { background: #f8fafc; border: 1px solid #cbd5e0; border-radius: 14px; padding: 1.25rem; margin-bottom: 2rem; }
+    .checklist-header { display: flex; gap: 0.85rem; align-items: flex-start; margin-bottom: 0.75rem; }
+    .chk-icon { font-size: 1.5rem; }
+    .checklist-header h4 { margin: 0 0 2px 0; font-size: 0.98rem; font-weight: 800; color: #0f172a; }
+    .checklist-header p { margin: 0; font-size: 0.82rem; color: #64748b; }
+    .checklist-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.65rem; font-size: 0.82rem; color: #334155; }
+    .chk-item { background: white; border: 1px solid #e2e8f0; padding: 0.55rem 0.85rem; border-radius: 8px; }
+
+    .history-section { margin-top: 1.5rem; }
+    .section-heading-row { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem; }
+    .eyebrow { font-size: 0.78rem; font-weight: 800; color: #2b6cb0; letter-spacing: 0.05em; margin-bottom: 2px; }
+    .section-heading-row h2 { margin: 0; font-size: 1.4rem; color: #0f172a; font-weight: 800; }
+
+    .tab-pills { display: flex; gap: 0.5rem; }
+    .tab-pill { background: white; border: 1px solid #cbd5e0; padding: 0.45rem 1rem; border-radius: 20px; font-size: 0.82rem; font-weight: 700; color: #64748b; cursor: pointer; }
+    .tab-pill.active { background: #2b6cb0; color: white; border-color: #2b6cb0; }
+
+    .sessions-list { display: flex; flex-direction: column; gap: 1.25rem; }
+
+    .session-card { background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
+    .session-info { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+
+    .therapist-badge { display: flex; gap: 1rem; align-items: center; }
+    .avatar-monogram { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white; font-size: 1.15rem; flex-shrink: 0; }
+    .bg-blue { background: linear-gradient(135deg, #2b6cb0, #4299e1); }
+    .bg-teal { background: linear-gradient(135deg, #2c7a7b, #319795); }
+    .bg-purple { background: linear-gradient(135deg, #6b46c1, #805ad5); }
+    .bg-indigo { background: linear-gradient(135deg, #4c51bf, #667eea); }
+
+    .therapist-badge h3 { margin: 0; font-size: 1.1rem; color: #1a202c; font-weight: 700; }
+    .session-date { margin: 2px 0 4px 0; font-size: 0.85rem; color: #4a5568; }
+    .mode-tag { display: inline-block; background: #ebf8ff; color: #2b6cb0; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+    .status-block { display: flex; align-items: center; gap: 1rem; }
+    .status-chip { font-size: 0.8rem; font-weight: 700; padding: 4px 12px; border-radius: 999px; }
+    .status-chip.confirmed { background: #c6f6d5; color: #22543d; }
+    .status-chip.pending { background: #feebc8; color: #744210; }
+    .amount { font-size: 1.15rem; font-weight: 800; color: #2d3748; }
+
+    .notes-box { background: #f8fafc; border-left: 3px solid #3182ce; padding: 0.65rem 0.9rem; font-size: 0.85rem; color: #4a5568; margin: 1rem 0 0.5rem 0; border-radius: 0 8px 8px 0; }
+
+    .session-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #edf2f7; pt: 1rem; margin-top: 1rem; flex-wrap: wrap; gap: 1rem; }
+    .ref-info { font-size: 0.8rem; color: #718096; }
+    .ref-info code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #2d3748; font-weight: 700; }
+
+    .btn-action-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .action-btn { padding: 0.55rem 1rem; border-radius: 8px; font-weight: 700; cursor: pointer; border: none; font-size: 0.85rem; transition: all 0.2s ease; }
+    .action-btn.secondary-sm { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e0; }
+    .action-btn.secondary-sm:hover { background: #e2e8f0; }
+
+    .join-btn { background: #38a169; color: white; text-decoration: none; padding: 0.55rem 1.1rem; border-radius: 8px; font-weight: 700; display: inline-block; box-shadow: 0 4px 10px rgba(56,161,105,0.25); }
+    .join-btn:hover { background: #2f855a; }
+
+    .table-responsive { overflow-x: auto; background: white; border-radius: 14px; border: 1px solid #e2e8f0; }
+    .payment-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }
+    .payment-table th { background: #f8fafc; padding: 0.85rem 1.25rem; font-weight: 700; color: #4a5568; border-bottom: 1px solid #e2e8f0; }
+    .payment-table td { padding: 1rem 1.25rem; border-bottom: 1px solid #edf2f7; color: #2d3748; }
+
+    .table-chip { font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: 4px; }
+    .table-chip.success { background: #c6f6d5; color: #22543d; }
+    .table-chip.pending { background: #feebc8; color: #744210; }
+
+    .loading-state, .empty-state { text-align: center; padding: 3rem; background: white; border-radius: 16px; margin-top: 1rem; }
+    .action-btn.primary { background: #2b6cb0; color: white; text-decoration: none; padding: 0.65rem 1.25rem; border-radius: 8px; display: inline-block; font-weight: 600; }
+</style>
+
+@code {
+    private List<TherapistSession> sessions = new();
+    private List<PaymentRecord> payments = new();
+    private bool isLoading = true;
+    private string activeTab = "all";
+
+    private IEnumerable<TherapistSession> FilteredSessions => activeTab switch
+    {
+        "confirmed" => sessions.Where(s => s.Status == "Confirmed"),
+        _ => sessions
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        sessions = await BookingService.GetUserSessionsAsync();
+        payments = await BookingService.GetPaymentHistoryAsync();
+        isLoading = false;
+    }
+
+    private void SetTab(string tab) => activeTab = tab;
+
+    private void DownloadReceipt(TherapistSession s)
+    {
+        // Simulated receipt download trigger
+    }
+
+    private string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "TH";
+        var parts = name.Replace("Dr. ", "").Replace(", Ph.D.", "").Replace(", M.Sc.", "").Replace(", MA", "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2) return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+        return parts[0][..Math.Min(2, parts[0].Length)].ToUpper();
+    }
+
+    private string GetBgColorClass(int id) => (id % 4) switch
+    {
+        1 => "bg-blue",
+        2 => "bg-teal",
+        3 => "bg-purple",
+        _ => "bg-indigo"
+    };
+}

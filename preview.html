@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Cognia - Therapist Profiles, Session Booking & Payment Receipts</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+    <style>
+        :root {
+            --primary: #2b6cb0;
+            --primary-hover: #2c5282;
+            --teal: #319795;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --radius-lg: 18px;
+            --radius-md: 12px;
+            --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--font); background-color: var(--bg); color: var(--text-dark); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+
+        /* Top Navigation Header */
+        header { background: #ffffff; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .nav-container { max-width: 1200px; margin: 0 auto; padding: 0.85rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+        .brand { display: flex; align-items: center; gap: 0.6rem; font-weight: 800; font-size: 1.35rem; color: var(--primary); text-decoration: none; cursor: pointer; }
+        .brand-icon { width: 34px; height: 34px; background: linear-gradient(135deg, #2b6cb0, #4299e1); border-radius: 10px; color: white; display: flex; align-items: center; justify-content: center; }
+        
+        .nav-links { display: flex; gap: 1rem; align-items: center; }
+        .nav-btn { text-decoration: none; font-size: 0.9rem; font-weight: 700; color: var(--text-muted); padding: 0.55rem 1.1rem; border-radius: var(--radius-md); transition: all 0.2s ease; cursor: pointer; border: none; background: transparent; }
+        .nav-btn:hover, .nav-btn.active { color: var(--primary); background: #ebf8ff; }
+
+        /* Main Container */
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem; }
+
+        /* Page View Switcher */
+        .page-view { display: none; }
+        .page-view.active { display: block; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Welcome Band */
+        .welcome-band { background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%); border: 1px solid var(--border); border-radius: 20px; padding: 2rem; margin-bottom: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.02); }
+        .eyebrow { font-size: 0.78rem; font-weight: 800; color: var(--primary); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem; }
+        .status-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 3px rgba(16,185,129,0.2); }
+        .welcome-band h1 { font-size: 1.85rem; font-weight: 800; color: var(--text-dark); margin-bottom: 0.5rem; line-height: 1.25; }
+        .welcome-band h1 em { font-style: normal; color: var(--primary); }
+        .welcome-lede { font-size: 0.95rem; color: var(--text-muted); max-width: 720px; }
+
+        /* Crisis Helpline Banner */
+        .crisis-banner { background: #fff5f5; border: 1px solid #fed7d7; color: #9b2c2c; padding: 0.85rem 1.25rem; border-radius: 12px; font-size: 0.88rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem; }
+        .crisis-tag { background: #e53e3e; color: white; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        /* Directory Controls */
+        .controls-row { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+        .search-box { position: relative; flex: 1; min-width: 280px; }
+        .search-box input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.6rem; border-radius: var(--radius-md); border: 1px solid var(--border); font-size: 0.9rem; outline: none; font-family: inherit; }
+        .search-box input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(43,108,176,0.15); }
+        .search-icon-svg { position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+
+        .sort-box { display: flex; align-items: center; gap: 0.5rem; }
+        .sort-box label { font-size: 0.85rem; font-weight: 700; color: #475569; }
+        .sort-box select { padding: 0.7rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--border); font-size: 0.88rem; font-weight: 600; color: var(--text-dark); background: white; cursor: pointer; }
+
+        .pills-bar { display: flex; gap: 0.65rem; flex-wrap: wrap; margin-bottom: 2rem; }
+        .pill { background: #ffffff; border: 1px solid var(--border); border-radius: 999px; padding: 0.5rem 1.1rem; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); cursor: pointer; transition: all 0.2s ease; }
+        .pill:hover, .pill.active { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 12px rgba(43,108,176,0.2); }
+
+        /* Therapist Grid */
+        .therapist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.75rem; }
+        .card { background: var(--card-bg); border-radius: var(--radius-lg); border: 1px solid var(--border); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 15px rgba(0,0,0,0.02); transition: all 0.25s ease; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 16px 30px rgba(0,0,0,0.06); border-color: #bee3f8; }
+
+        .card-header { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+        .avatar-monogram { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white; font-size: 1.25rem; flex-shrink: 0; }
+        .bg-blue { background: linear-gradient(135deg, #2b6cb0, #4299e1); }
+        .bg-teal { background: linear-gradient(135deg, #2c7a7b, #319795); }
+        .bg-purple { background: linear-gradient(135deg, #6b46c1, #805ad5); }
+        .bg-indigo { background: linear-gradient(135deg, #4c51bf, #667eea); }
+
+        .card-header h3 { font-size: 1.1rem; color: var(--text-dark); font-weight: 800; margin-bottom: 2px; }
+        .card-header p { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 4px; }
+        .rating-strip { font-size: 0.82rem; font-weight: 700; color: #d97706; }
+
+        .badge { display: inline-block; background: #ebf8ff; color: var(--primary); font-size: 0.78rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; margin-bottom: 0.75rem; }
+        .bio-text { font-size: 0.88rem; color: #475569; line-height: 1.5; margin-bottom: 0.85rem; }
+        
+        .mini-meta { background: #f8fafc; border-radius: 8px; padding: 0.65rem 0.85rem; font-size: 0.78rem; margin-bottom: 1rem; }
+        .mini-meta div { display: flex; justify-content: space-between; margin-bottom: 3px; }
+        .mini-meta span { color: #64748b; font-weight: 600; }
+        .mini-meta strong { color: #1e293b; text-align: right; }
+
+        .rate-box { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); pt: 1rem; margin-top: 0.85rem; }
+        .rate-amount { font-size: 1.15rem; font-weight: 800; color: var(--text-dark); }
+        .rate-unit { font-size: 0.75rem; color: var(--text-muted); }
+
+        .btn { background: var(--primary); color: white; border: none; border-radius: var(--radius-md); padding: 0.65rem 1.25rem; font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: background 0.2s ease; }
+        .btn:hover { background: var(--primary-hover); }
+
+        /* Booking Layout */
+        .booking-layout { display: grid; grid-template-columns: 1fr 370px; gap: 2rem; }
+        @media (max-width: 900px) { .booking-layout { grid-template-columns: 1fr; } }
+
+        .form-group { margin-bottom: 1.35rem; }
+        .form-group label { display: block; font-size: 0.88rem; font-weight: 700; color: #334155; margin-bottom: 0.5rem; }
+        .input-control { width: 100%; padding: 0.75rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--border); font-size: 0.9rem; font-family: inherit; }
+        .textarea-control { resize: vertical; }
+
+        .mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+        .mode-card { background: #f8fafc; border: 1.5px solid var(--border); border-radius: 12px; padding: 0.9rem; cursor: pointer; text-align: center; transition: all 0.2s ease; }
+        .mode-card.selected, .mode-card:hover { background: #ebf8ff; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(43,108,176,0.15); }
+        .mode-icon-svg { margin-bottom: 4px; display: flex; justify-content: center; }
+        .mode-card h4 { font-size: 0.85rem; font-weight: 800; color: var(--text-dark); margin-top: 2px; }
+        .mode-card p { font-size: 0.72rem; color: var(--text-muted); }
+
+        .dur-pills { display: flex; gap: 0.65rem; }
+        .dur-pill { background: #f8fafc; border: 1.5px solid var(--border); border-radius: 10px; padding: 0.55rem 1rem; font-size: 0.85rem; font-weight: 700; color: #475569; cursor: pointer; }
+        .dur-pill.selected, .dur-pill:hover { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .time-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)); gap: 0.6rem; }
+        .time-chip { padding: 0.65rem; border: 1px solid var(--border); border-radius: 10px; font-size: 0.85rem; font-weight: 700; color: #475569; text-align: center; cursor: pointer; background: white; }
+        .time-chip.selected, .time-chip:hover { background: #ebf8ff; border-color: var(--primary); color: var(--primary); }
+
+        .focus-tags { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+        .tag { background: #f1f5f9; border: 1px solid #e2e8f0; padding: 4px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer; color: #475569; }
+        .tag:hover { background: #cbd5e0; color: #0f172a; }
+
+        .summary-card { background: white; border-radius: var(--radius-lg); border: 1px solid var(--border); padding: 1.5rem; height: fit-content; position: sticky; top: 90px; }
+        .summary-row { display: flex; justify-content: space-between; font-size: 0.85rem; color: #475569; margin-bottom: 0.6rem; }
+        .summary-total { font-size: 1.15rem; font-weight: 800; color: var(--text-dark); border-top: 1.5px dashed var(--border); padding-top: 0.75rem; margin-top: 0.75rem; display: flex; justify-content: space-between; }
+
+        /* Tables & Receipts */
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border); }
+        th { background: #f8fafc; text-align: left; padding: 0.85rem 1.25rem; font-size: 0.85rem; font-weight: 700; color: #475569; border-bottom: 1px solid var(--border); }
+        td { padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; font-size: 0.88rem; }
+        .status-confirmed { background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 0.78rem; }
+        .join-link { background: #10b981; color: white; text-decoration: none; padding: 0.55rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.35rem; }
+
+        .back-btn { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; font-weight: 700; color: #475569; text-decoration: none; background: #ffffff; border: 1px solid #e2e8f0; padding: 0.45rem 1rem; border-radius: 999px; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.02); cursor: pointer; margin-bottom: 1.25rem; }
+        .back-btn:hover { color: var(--primary); border-color: #cbd5e0; background: #f8fafc; transform: translateX(-3px); }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1.25rem; margin-bottom: 1.75rem; }
+        .stat-card { background: white; border: 1px solid var(--border); border-radius: 14px; padding: 1.1rem 1.25rem; display: flex; align-items: center; gap: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+        .stat-icon { background: #ebf8ff; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--primary); flex-shrink: 0; }
+        .stat-val { font-size: 1.2rem; font-weight: 800; color: var(--text-dark); }
+        .stat-label { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); }
+
+        .prep-checklist-card { background: #f8fafc; border: 1px solid #cbd5e0; border-radius: 14px; padding: 1.25rem; margin-bottom: 2rem; }
+        .checklist-header { display: flex; gap: 0.85rem; align-items: flex-start; margin-bottom: 0.75rem; }
+        .chk-icon { background: #e2e8f0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #334155; font-size: 0.85rem; flex-shrink: 0; }
+        .checklist-header h4 { margin: 0 0 2px 0; font-size: 0.98rem; font-weight: 800; color: var(--text-dark); }
+        .checklist-header p { margin: 0; font-size: 0.82rem; color: var(--text-muted); }
+        .checklist-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.65rem; font-size: 0.82rem; color: #334155; }
+        .chk-item { background: white; border: 1px solid var(--border); padding: 0.6rem 0.85rem; border-radius: 8px; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; }
+        .chk-dot { width: 6px; height: 6px; background: #3182ce; border-radius: 50%; display: inline-block; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="nav-container">
+            <a class="brand" onclick="navigateTo('directory-view')">
+                <div class="brand-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><path d="M12 6v6l4 2"/></svg>
+                </div>
+                <span>Cognia</span>
+            </a>
+            <div class="nav-links">
+                <button class="nav-btn active" id="nav-therapists" onclick="navigateTo('directory-view')">Specialists Directory</button>
+                <button class="nav-btn" id="nav-payments" onclick="navigateTo('receipts-view')">My Sessions & Receipts</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+
+        <!-- VIEW 1: Specialist Directory -->
+        <div id="directory-view" class="page-view active">
+            <div class="welcome-band">
+                <p class="eyebrow"><span class="status-dot"></span> PROFESSIONAL THERAPY & COUNSELING</p>
+                <h1>Connect with verified <em>therapists & counselors.</em></h1>
+                <p class="welcome-lede">Browse qualified mental health professionals, find a supportive listening ear, and book confidential 1-on-1 consultations tailored to your emotional health.</p>
+            </div>
+
+            <div class="crisis-banner">
+                <span class="crisis-tag">Urgent Support</span>
+                <span>Call the Ghana Mental Health Authority Helpline at <strong>0800 678 678</strong> (Free 24/7 Crisis Support).</span>
+            </div>
+
+            <div class="controls-row">
+                <div class="search-box">
+                    <svg class="search-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" id="searchInput" placeholder="Search by specialist name or focus (e.g. Anxiety, Stress, Sarah, Wilson)..." oninput="filterTherapists()" />
+                </div>
+                <div class="sort-box">
+                    <label>Sort by:</label>
+                    <select id="sortSelect" onchange="sortTherapists()">
+                        <option value="rating">Highest Rated</option>
+                        <option value="price_low">Price: Low to High</option>
+                        <option value="price_high">Price: High to Low</option>
+                        <option value="reviews">Most Reviewed</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="pills-bar">
+                <button class="pill active" onclick="filterCategory('All', this)">All Specialists (6)</button>
+                <button class="pill" onclick="filterCategory('Anxiety & Depression', this)">Anxiety & Depression</button>
+                <button class="pill" onclick="filterCategory('Academic & Career Pressure', this)">Academic Pressure</button>
+                <button class="pill" onclick="filterCategory('Trauma & Emotional Resilience', this)">Trauma & Grief</button>
+                <button class="pill" onclick="filterCategory('Relationships & Self-Care', this)">Relationships</button>
+                <button class="pill" onclick="filterCategory('Stress & Burnout', this)">Stress & Burnout</button>
+            </div>
+
+            <div class="therapist-grid" id="therapistGrid">
+                <!-- 1. Dr. Hannah Wilson -->
+                <div class="card" data-category="Anxiety & Depression" data-name="Dr. Hannah Wilson" data-rate="180" data-rating="4.9" data-reviews="42">
+                    <div>
+                        <div class="card-header">
+                            <div class="avatar-monogram bg-blue">HW</div>
+                            <div>
+                                <h3>Dr. Hannah Wilson</h3>
+                                <p>Clinical Psychologist, Ph.D.</p>
+                                <div class="rating-strip">★ 4.9 <span style="color:#94a3b8; font-weight:400;">(42 reviews)</span></div>
+                            </div>
+                        </div>
+                        <span class="badge">Anxiety & Depression</span>
+                        <p class="bio-text">Specializing in Cognitive Behavioral Therapy (CBT) helping young adults navigate stress, mood regulation, and personal growth.</p>
+                        
+                        <div class="mini-meta">
+                            <div><span>Education:</span> <strong>Ph.D. Clinical Psych, UG</strong></div>
+                            <div><span>Languages:</span> <strong>English, Twi</strong></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="rate-box">
+                            <div>
+                                <div class="rate-amount">GH₵ 180.00</div>
+                                <div class="rate-unit">per 60-min session</div>
+                            </div>
+                            <button class="btn" onclick="startBooking('Dr. Hannah Wilson', 'Clinical Psychologist, Ph.D.', 'Anxiety & Depression', 180.00, 'HW', 'bg-blue')">Book Consultation</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Emmanuel Baidoo -->
+                <div class="card" data-category="Academic & Career Pressure" data-name="Emmanuel Baidoo" data-rate="140" data-rating="4.8" data-reviews="31">
+                    <div>
+                        <div class="card-header">
+                            <div class="avatar-monogram bg-teal">EB</div>
+                            <div>
+                                <h3>Emmanuel Baidoo, M.Sc.</h3>
+                                <p>Licensed Counselor & Wellness Coach</p>
+                                <div class="rating-strip">★ 4.8 <span style="color:#94a3b8; font-weight:400;">(31 reviews)</span></div>
+                            </div>
+                        </div>
+                        <span class="badge">Academic & Career Pressure</span>
+                        <p class="bio-text">Focused on burnout prevention, student mental health, and exam anxiety coping mechanisms tailored for university students.</p>
+                        
+                        <div class="mini-meta">
+                            <div><span>Education:</span> <strong>M.Sc. Counseling, KNUST</strong></div>
+                            <div><span>Languages:</span> <strong>English, Fante, Twi</strong></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="rate-box">
+                            <div>
+                                <div class="rate-amount">GH₵ 140.00</div>
+                                <div class="rate-unit">per 60-min session</div>
+                            </div>
+                            <button class="btn" onclick="startBooking('Emmanuel Baidoo, M.Sc.', 'Licensed Counselor & Wellness Coach', 'Academic & Career Pressure', 140.00, 'EB', 'bg-teal')">Book Consultation</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Dr. Sarah Mensah -->
+                <div class="card" data-category="Trauma & Emotional Resilience" data-name="Dr. Sarah Mensah" data-rate="220" data-rating="5.0" data-reviews="58">
+                    <div>
+                        <div class="card-header">
+                            <div class="avatar-monogram bg-purple">SM</div>
+                            <div>
+                                <h3>Dr. Sarah Mensah</h3>
+                                <p>Senior Consultant Psychiatrist</p>
+                                <div class="rating-strip">★ 5.0 <span style="color:#94a3b8; font-weight:400;">(58 reviews)</span></div>
+                            </div>
+                        </div>
+                        <span class="badge">Trauma & Emotional Resilience</span>
+                        <p class="bio-text">Dedicated practitioner providing compassionate care for trauma recovery, grief support, and mindfulness-based stress reduction.</p>
+                        
+                        <div class="mini-meta">
+                            <div><span>Education:</span> <strong>FWACP Psychiatry, Korle Bu</strong></div>
+                            <div><span>Languages:</span> <strong>English, Ga, Twi</strong></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="rate-box">
+                            <div>
+                                <div class="rate-amount">GH₵ 220.00</div>
+                                <div class="rate-unit">per 60-min session</div>
+                            </div>
+                            <button class="btn" onclick="startBooking('Dr. Sarah Mensah', 'Senior Consultant Psychiatrist', 'Trauma & Emotional Resilience', 220.00, 'SM', 'bg-purple')">Book Consultation</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Gibson Osei -->
+                <div class="card" data-category="Relationships & Self-Care" data-name="Gibson Osei" data-rate="160" data-rating="4.7" data-reviews="19">
+                    <div>
+                        <div class="card-header">
+                            <div class="avatar-monogram bg-indigo">GO</div>
+                            <div>
+                                <h3>Gibson Osei, MA</h3>
+                                <p>Relationship & Family Therapist</p>
+                                <div class="rating-strip">★ 4.7 <span style="color:#94a3b8; font-weight:400;">(19 reviews)</span></div>
+                            </div>
+                        </div>
+                        <span class="badge">Relationships & Self-Care</span>
+                        <p class="bio-text">Helping individuals and couples build healthier communication, emotional awareness, and strong interpersonal boundaries.</p>
+                        
+                        <div class="mini-meta">
+                            <div><span>Education:</span> <strong>MA Family Therapy, UCC</strong></div>
+                            <div><span>Languages:</span> <strong>English, Twi</strong></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="rate-box">
+                            <div>
+                                <div class="rate-amount">GH₵ 160.00</div>
+                                <div class="rate-unit">per 60-min session</div>
+                            </div>
+                            <button class="btn" onclick="startBooking('Gibson Osei, MA', 'Relationship & Family Therapist', 'Relationships & Self-Care', 160.00, 'GO', 'bg-indigo')">Book Consultation</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. Andrew Nii Attram -->
+                <div class="card" data-category="Stress & Burnout" data-name="Andrew Nii Attram" data-rate="150" data-rating="4.9" data-reviews="27">
+                    <div>
+                        <div class="card-header">
+                            <div class="avatar-monogram bg-blue">AA</div>
+                            <div>
+                                <h3>Andrew Nii Attram, M.Sc.</h3>
+                                <p>Stress & Burnout Specialist</p>
+                                <div class="rating-strip">★ 4.9 <span style="color:#94a3b8; font-weight:400;">(27 reviews)</span></div>
+                            </div>
+                        </div>
+                        <span class="badge">Stress & Burnout</span>
+                        <p class="bio-text">Guiding students and workers through workplace stress management, healthy work-life balance, and relaxation techniques.</p>
+                        
+                        <div class="mini-meta">
+                            <div><span>Education:</span> <strong>M.Sc. Health Psych, Legon</strong></div>
+                            <div><span>Languages:</span> <strong>English, Ga, Ewe</strong></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="rate-box">
+                            <div>
+                                <div class="rate-amount">GH₵ 150.00</div>
+                                <div class="rate-unit">per 60-min session</div>
+                            </div>
+                            <button class="btn" onclick="startBooking('Andrew Nii Attram, M.Sc.', 'Stress & Burnout Specialist', 'Stress & Burnout', 150.00, 'AA', 'bg-blue')">Book Consultation</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. Dr. Patricia Aryee -->
+                <div class="card" data-category="Trauma & Emotional Resilience" data-name="Dr. Patricia Aryee" data-rate="195" data-rating="4.9" data-reviews="36">
+                    <div>
+                        <div class="card-header">
+                            <div class="avatar-monogram bg-teal">PA</div>
+                            <div>
+                                <h3>Dr. Patricia Aryee</h3>
+                                <p>Grief & Bereavement Counselor</p>
+                                <div class="rating-strip">★ 4.9 <span style="color:#94a3b8; font-weight:400;">(36 reviews)</span></div>
+                            </div>
+                        </div>
+                        <span class="badge">Grief & Coping</span>
+                        <p class="bio-text">Providing safe, supportive therapy for loss, life transitions, emotional healing, and building personal coping strategies.</p>
+                        
+                        <div class="mini-meta">
+                            <div><span>Education:</span> <strong>Ph.D. Counseling, UG</strong></div>
+                            <div><span>Languages:</span> <strong>English, Twi</strong></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="rate-box">
+                            <div>
+                                <div class="rate-amount">GH₵ 195.00</div>
+                                <div class="rate-unit">per 60-min session</div>
+                            </div>
+                            <button class="btn" onclick="startBooking('Dr. Patricia Aryee', 'Grief & Bereavement Counselor', 'Grief & Coping', 195.00, 'PA', 'bg-teal')">Book Consultation</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- VIEW 2: Session Booking Form -->
+        <div id="booking-view" class="page-view">
+            <a class="back-btn" onclick="navigateTo('directory-view')">← Specialists</a>
+
+            <div class="booking-layout">
+                <div class="card">
+                    <h2 id="booking-title" style="margin-bottom:0.25rem; font-size:1.35rem;">Book 1-on-1 Consultation</h2>
+                    <p style="font-size:0.88rem; color:#64748b; margin-bottom:1.5rem;">Select your preferred mode, session length, date & time slot.</p>
+
+                    <!-- Mode -->
+                    <div class="form-group">
+                        <label>1. Consultation Format</label>
+                        <div class="mode-grid">
+                            <div class="mode-card selected" onclick="selectMode(this, 'Encrypted Video Call')">
+                                <div class="mode-icon-svg">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2b6cb0" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                                </div>
+                                <h4>Video Call</h4>
+                                <p>Encrypted 1-on-1 video via Jitsi</p>
+                            </div>
+                            <div class="mode-card" onclick="selectMode(this, 'Private Audio Call')">
+                                <div class="mode-icon-svg">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2b6cb0" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                </div>
+                                <h4>Audio Call</h4>
+                                <p>Private voice consultation</p>
+                            </div>
+                            <div class="mode-card" onclick="selectMode(this, 'Confidential Text Chat')">
+                                <div class="mode-icon-svg">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2b6cb0" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                </div>
+                                <h4>Live Chat</h4>
+                                <p>Real-time structured chat</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Duration -->
+                    <div class="form-group">
+                        <label>2. Duration</label>
+                        <div class="dur-pills">
+                            <div class="dur-pill" onclick="selectDuration(30, this)">30 Mins</div>
+                            <div class="dur-pill selected" onclick="selectDuration(60, this)">60 Mins (Standard)</div>
+                            <div class="dur-pill" onclick="selectDuration(90, this)">90 Mins (In-Depth)</div>
+                        </div>
+                    </div>
+
+                    <!-- Inputs -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                        <div class="form-group">
+                            <label>Your Full Name</label>
+                            <input type="text" id="clientNameInput" class="input-control" placeholder="Enter your full name" />
+                        </div>
+                        <div class="form-group">
+                            <label>Email Address (For receipts & video link)</label>
+                            <input type="email" id="clientEmailInput" class="input-control" placeholder="Enter your email address" />
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Select Date</label>
+                        <input type="date" id="sessionDateInput" class="input-control" value="2026-10-05" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Select Time Slot</label>
+                        <div class="time-chips">
+                            <div class="time-chip selected" onclick="selectTime(this)">09:00 AM</div>
+                            <div class="time-chip" onclick="selectTime(this)">11:00 AM</div>
+                            <div class="time-chip" onclick="selectTime(this)">02:00 PM</div>
+                            <div class="time-chip" onclick="selectTime(this)">04:00 PM</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Focus Topics & Notes (Optional)</label>
+                        <div class="focus-tags">
+                            <span class="tag" onclick="addTag('Academic Stress')">+ Academic Stress</span>
+                            <span class="tag" onclick="addTag('Anxiety & Panic')">+ Anxiety</span>
+                            <span class="tag" onclick="addTag('Burnout')">+ Burnout</span>
+                            <span class="tag" onclick="addTag('Relationships')">+ Relationships</span>
+                        </div>
+                        <textarea id="notesInput" class="input-control textarea-control" rows="3" placeholder="Share any topics or context for your specialist..."></textarea>
+                    </div>
+
+                    <button class="btn" id="pay-button" style="width:100%; padding:0.9rem; font-size:1rem; margin-top:1rem;" onclick="completePayment()">Proceed to Pay GH₵ 180.00</button>
+                </div>
+
+                <!-- Sidebar -->
+                <aside class="summary-card">
+                    <h3 style="font-size:1.1rem; color:var(--text-dark); margin-bottom:1rem;">Consultation Summary</h3>
+                    
+                    <div style="display:flex; gap:0.85rem; align-items:center; margin-bottom:1rem;">
+                        <div id="summary-monogram" class="avatar-monogram bg-blue" style="width:50px; height:50px; font-size:1.1rem;">HW</div>
+                        <div>
+                            <h4 id="summary-name" style="font-size:1rem;">Dr. Hannah Wilson</h4>
+                            <p id="summary-title" style="font-size:0.8rem; color:#64748b;">Clinical Psychologist, Ph.D.</p>
+                        </div>
+                    </div>
+
+                    <div class="summary-row">
+                        <span>Format:</span>
+                        <strong id="summary-mode">Encrypted Video Call</strong>
+                    </div>
+                    <div class="summary-row">
+                        <span>Duration:</span>
+                        <strong id="summary-duration">60 Mins</strong>
+                    </div>
+                    <div class="summary-row">
+                        <span>Fee:</span>
+                        <strong id="summary-rate-breakdown">GH₵ 180.00</strong>
+                    </div>
+
+                    <div class="summary-total">
+                        <span>Total Payable:</span>
+                        <span id="summary-rate">GH₵ 180.00</span>
+                    </div>
+                </aside>
+            </div>
+        </div>
+
+        <!-- VIEW 3: Session Receipt -->
+        <div id="receipts-view" class="page-view">
+            <a class="back-btn" onclick="navigateTo('directory-view')">← Specialists</a>
+
+            <!-- Stats Bar -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                    </div>
+                    <div>
+                        <div class="stat-val">1 Session</div>
+                        <div class="stat-label">Confirmed Sessions</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div>
+                        <div class="stat-val">1.0 hrs</div>
+                        <div class="stat-label">Total Care Hours</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                    </div>
+                    <div>
+                        <div class="stat-val" id="stats-total-spent">GH₵ 180.00</div>
+                        <div class="stat-label">Total Investment</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    </div>
+                    <div>
+                        <div class="stat-val">100% Encrypted</div>
+                        <div class="stat-label">Privacy Guarantee</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pre-Session Checklist Card -->
+            <div class="prep-checklist-card">
+                <div class="checklist-header">
+                    <div class="chk-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    </div>
+                    <div>
+                        <h4>Pre-Session Checklist & Tech Check</h4>
+                        <p>Follow these quick recommendations before joining your 1-on-1 video call:</p>
+                    </div>
+                </div>
+                <div class="checklist-items">
+                    <div class="chk-item"><span class="chk-dot"></span> <strong>Quiet Environment:</strong> Choose a private room free of interruptions.</div>
+                    <div class="chk-item"><span class="chk-dot"></span> <strong>Use Headphones:</strong> Plug in headphones for maximum audio privacy.</div>
+                    <div class="chk-item"><span class="chk-dot"></span> <strong>Join 5 Mins Early:</strong> Connect a few minutes before start time to test mic & camera.</div>
+                </div>
+            </div>
+
+            <h2 style="margin-bottom:1rem;">My Booked Sessions & Payment Receipts</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Therapist & Schedule</th>
+                        <th>Reference</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Action / Video Join</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong id="receipt-name">Dr. Hannah Wilson</strong><br><span style="font-size:0.82rem; color:#64748b;">Tomorrow at 09:00 AM (60 Mins Video)</span></td>
+                        <td><code id="receipt-ref" style="background:#f1f5f9; padding:3px 8px; border-radius:6px; font-family:monospace;">COGNIA-PAY-8F2A91C0</code></td>
+                        <td><strong id="receipt-rate">GH₵ 180.00</strong></td>
+                        <td><span class="status-confirmed">✓ Confirmed</span></td>
+                        <td>
+                            <a href="https://meet.jit.si/cognia-therapy-demo" target="_blank" class="join-link">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                                <span>Launch Jitsi Room →</span>
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script>
+        let currentTherapist = { name: 'Dr. Hannah Wilson', title: 'Clinical Psychologist, Ph.D.', spec: 'Anxiety & Depression', rate: 180, initials: 'HW', bg: 'bg-blue' };
+        let selectedMins = 60;
+        let selectedModeText = 'Encrypted Video Call';
+
+        function navigateTo(viewId) {
+            document.querySelectorAll('.page-view').forEach(el => el.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+
+            if (viewId === 'directory-view') {
+                document.getElementById('nav-therapists').classList.add('active');
+                document.getElementById('nav-payments').classList.remove('active');
+            } else if (viewId === 'receipts-view') {
+                document.getElementById('nav-payments').classList.add('active');
+                document.getElementById('nav-therapists').classList.remove('active');
+            }
+        }
+
+        function startBooking(name, title, spec, rate, initials, bgClass) {
+            currentTherapist = { name, title, spec, rate, initials, bg: bgClass };
+            document.getElementById('booking-title').innerText = `Book Session with ${name}`;
+            document.getElementById('summary-name').innerText = name;
+            document.getElementById('summary-title').innerText = title;
+            
+            const monoEl = document.getElementById('summary-monogram');
+            monoEl.innerText = initials;
+            monoEl.className = `avatar-monogram ${bgClass}`;
+
+            updateSummaryPrice();
+            navigateTo('booking-view');
+        }
+
+        function selectMode(el, mode) {
+            document.querySelectorAll('.mode-card').forEach(m => m.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedModeText = mode;
+            document.getElementById('summary-mode').innerText = mode;
+        }
+
+        function selectDuration(mins, el) {
+            document.querySelectorAll('.dur-pill').forEach(p => p.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedMins = mins;
+            document.getElementById('summary-duration').innerText = `${mins} Mins`;
+            updateSummaryPrice();
+        }
+
+        function updateSummaryPrice() {
+            let mult = selectedMins === 30 ? 0.6 : (selectedMins === 90 ? 1.45 : 1.0);
+            let finalPrice = (currentTherapist.rate * mult).toFixed(2);
+            document.getElementById('summary-rate').innerText = `GH₵ ${finalPrice}`;
+            document.getElementById('summary-rate-breakdown').innerText = `GH₵ ${finalPrice}`;
+            document.getElementById('pay-button').innerText = `Proceed to Pay GH₵ ${finalPrice}`;
+        }
+
+        function selectTime(el) {
+            document.querySelectorAll('.time-chip').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        function addTag(tag) {
+            const input = document.getElementById('notesInput');
+            if (!input.value) input.value = `Focus: ${tag}`;
+            else input.value += `, ${tag}`;
+        }
+
+        function completePayment() {
+            const email = document.getElementById('clientEmailInput').value || 'client@example.com';
+            const mult = selectedMins === 30 ? 0.6 : (selectedMins === 90 ? 1.45 : 1.0);
+            const finalAmount = currentTherapist.rate * mult;
+            const amountInKobo = Math.round(finalAmount * 100);
+            const randomRef = 'COGNIA-PAY-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+
+            if (typeof PaystackPop !== 'undefined') {
+                const handler = PaystackPop.setup({
+                    key: 'pk_test_cce97442fea16049dd3622d782b3984ad03cd27e',
+                    email: email,
+                    amount: amountInKobo,
+                    currency: 'GHS',
+                    ref: randomRef,
+                    onClose: function() {
+                        alert('Paystack transaction window closed.');
+                    },
+                    callback: function(response) {
+                        document.getElementById('receipt-name').innerText = currentTherapist.name;
+                        document.getElementById('receipt-ref').innerText = response.reference || randomRef;
+                        document.getElementById('receipt-rate').innerText = `GH₵ ${finalAmount.toFixed(2)}`;
+                        navigateTo('receipts-view');
+                    }
+                });
+                handler.openIframe();
+            } else {
+                document.getElementById('receipt-name').innerText = currentTherapist.name;
+                document.getElementById('receipt-ref').innerText = randomRef;
+                document.getElementById('receipt-rate').innerText = `GH₵ ${finalAmount.toFixed(2)}`;
+                navigateTo('receipts-view');
+            }
+        }
+
+        function filterTherapists() {
+            const q = document.getElementById('searchInput').value.toLowerCase();
+            document.querySelectorAll('#therapistGrid .card').forEach(card => {
+                const text = card.innerText.toLowerCase();
+                card.style.display = text.includes(q) ? 'flex' : 'none';
+            });
+        }
+
+        function filterCategory(cat, el) {
+            document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+            el.classList.add('active');
+            document.querySelectorAll('#therapistGrid .card').forEach(card => {
+                if (cat === 'All') card.style.display = 'flex';
+                else {
+                    const cardCat = card.getAttribute('data-category');
+                    card.style.display = cardCat === cat ? 'flex' : 'none';
+                }
+            });
+        }
+
+        function sortTherapists() {
+            const val = document.getElementById('sortSelect').value;
+            const grid = document.getElementById('therapistGrid');
+            const cards = Array.from(grid.getElementsByClassName('card'));
+            
+            cards.sort((a, b) => {
+                let rA = parseFloat(a.getAttribute('data-rate'));
+                let rB = parseFloat(b.getAttribute('data-rate'));
+                let rtA = parseFloat(a.getAttribute('data-rating'));
+                let rtB = parseFloat(b.getAttribute('data-rating'));
+                let revA = parseInt(a.getAttribute('data-reviews'));
+                let revB = parseInt(b.getAttribute('data-reviews'));
+
+                if (val === 'price_low') return rA - rB;
+                if (val === 'price_high') return rB - rA;
+                if (val === 'reviews') return revB - revA;
+                return rtB - rtA;
+            });
+
+            cards.forEach(c => grid.appendChild(c));
+        }
+    </script>
+</body>
+</html>
