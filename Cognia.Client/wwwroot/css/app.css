@@ -592,6 +592,76 @@ button:disabled {
     padding-top: .8rem;
 }
 
+.reminder-settings {
+    border-top: 1px solid #d9e2d3;
+    margin-top: 1rem;
+    padding-top: 1rem;
+}
+
+.reminder-toggle {
+    align-items: center;
+    color: var(--forest-deep);
+    display: flex;
+    font-size: .78rem;
+    font-weight: 600;
+    gap: .55rem;
+}
+
+.reminder-toggle input {
+    accent-color: var(--forest);
+    height: 1rem;
+    width: 1rem;
+}
+
+.reminder-time-row {
+    align-items: center;
+    color: var(--muted);
+    display: flex;
+    font-size: .75rem;
+    justify-content: space-between;
+    margin-top: .7rem;
+}
+
+.reminder-time-row input {
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    color: var(--forest-deep);
+    font: inherit;
+    padding: .35rem .5rem;
+}
+
+.reminder-save {
+    background: transparent;
+    border: 1px solid var(--forest);
+    border-radius: 2px;
+    color: var(--forest);
+    cursor: pointer;
+    font-size: .74rem;
+    font-weight: 700;
+    margin-top: .7rem;
+    padding: .45rem .65rem;
+}
+
+.reminder-save:hover {
+    background: var(--forest);
+    color: var(--white);
+}
+
+.reminder-message {
+    color: var(--forest);
+    font-size: .72rem;
+    margin: .55rem 0 0;
+    min-height: 1rem;
+}
+
+.reminder-note {
+    color: var(--muted);
+    font-size: .65rem;
+    line-height: 1.4;
+    margin: .25rem 0 0;
+}
+
 .privacy-note span {
     color: var(--forest);
     font-size: 1rem;
