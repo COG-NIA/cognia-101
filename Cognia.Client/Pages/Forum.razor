@@ -1,5 +1,7 @@
 @page "/forum"
 @using Cognia.Shared.Models
+@using Microsoft.AspNetCore.SignalR.Client
+@implements IDisposable
 @inject HttpClient Http
 
 <PageTitle>Safe Space Forum</PageTitle>
@@ -171,10 +173,43 @@
     private bool showComposer;
     private readonly CreateForumThreadRequest newThread = new() { Category = "General", Author = "Guest" };
     private readonly CreateForumReplyRequest newReply = new() { Author = "Guest" };
+    private HubConnection? hubConnection;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadForumAsync();
+        await StartSignalRConnectionAsync();
+    }
+
+    private async Task StartSignalRConnectionAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl("https://localhost:7214/hubs/notifications")
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<NotificationMessage>("ReceiveNotification", async message =>
+        {
+            if (message.Type != "forum-reply" || message.ThreadId is not int threadId)
+            {
+                return;
+            }
+
+            await InvokeAsync(async () =>
+            {
+                await RefreshThreadAsync(threadId);
+                StateHasChanged();
+            });
+        });
+
+        try
+        {
+            await hubConnection.StartAsync();
+        }
+        catch (Exception)
+        {
+            // Real-time is optional: the forum should still load without it.
+        }
     }
 
     private async Task LoadForumAsync()
@@ -227,6 +262,30 @@
             allThreads.Add(sampleThread);
             selectedThread = sampleThread;
             FilterByCategory("All");
+        }
+    }
+
+    private async Task RefreshThreadAsync(int threadId)
+    {
+        try
+        {
+            var thread = await Http.GetFromJsonAsync<ForumThread>($"api/forum/threads/{threadId}");
+            var index = allThreads.FindIndex(item => item.Id == threadId);
+            if (thread is null || index < 0)
+            {
+                return;
+            }
+
+            allThreads[index] = thread;
+            if (selectedThread?.Id == threadId)
+            {
+                selectedThread = thread;
+            }
+
+            FilterByCategory(selectedCategory);
+        }
+        catch (HttpRequestException)
+        {
         }
     }
 
@@ -287,6 +346,14 @@
             newReply.Author = "Guest";
             newReply.IsAnonymous = false;
             await LoadForumAsync();
+        }
+    }
+
+    public void Dispose()
+    {
+        if (hubConnection is not null)
+        {
+            _ = hubConnection.DisposeAsync();
         }
     }
 }

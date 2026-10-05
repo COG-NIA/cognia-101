@@ -1,3 +1,4 @@
+using Cognia.API.Services;
 using Cognia.Shared.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,6 +8,17 @@ namespace Cognia.API.Controllers;
 [Route("api/forum")]
 public class ForumController : ControllerBase
 {
+    private readonly INotificationService? _notificationService;
+
+    public ForumController() : this(null)
+    {
+    }
+
+    public ForumController(INotificationService? notificationService)
+    {
+        _notificationService = notificationService;
+    }
+
     private static readonly List<ForumThread> Threads = new()
     {
         new ForumThread
@@ -120,7 +132,7 @@ public class ForumController : ControllerBase
     }
 
     [HttpPost("threads/{id}/replies")]
-    public ActionResult<ForumReply> AddReply(int id, [FromBody] CreateForumReplyRequest request)
+    public async Task<ActionResult<ForumReply>> AddReply(int id, [FromBody] CreateForumReplyRequest request, CancellationToken cancellationToken = default)
     {
         var thread = Threads.FirstOrDefault(t => t.Id == id);
         if (thread is null)
@@ -144,6 +156,12 @@ public class ForumController : ControllerBase
         };
 
         thread.Replies.Add(reply);
+
+        if (_notificationService is not null)
+        {
+            await _notificationService.SendReplyNotificationAsync(id, reply.Author, reply.IsAnonymous, reply.Content, cancellationToken);
+        }
+
         return Ok(reply);
     }
 }

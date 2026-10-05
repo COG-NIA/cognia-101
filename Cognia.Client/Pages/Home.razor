@@ -64,6 +64,24 @@
 						<p class="aside-quote">“You don't have to have it all figured out to take the next small step.”</p>
 						<span class="aside-credit">A NOTE TO YOURSELF</span>
 						<div class="privacy-note"><span aria-hidden="true">◎</span> Your check-ins stay in this browser.</div>
+						<div class="reminder-settings">
+							<label class="reminder-toggle">
+								<input type="checkbox" @bind="reminderEnabled" />
+								<span>Daily check-in reminder</span>
+							</label>
+							@if (reminderEnabled)
+							{
+								<div class="reminder-time-row">
+									<label for="reminder-time">Time</label>
+									<input id="reminder-time" type="time" @bind="reminderTime" />
+								</div>
+							}
+							<button class="reminder-save" type="button" @onclick="SaveReminderAsync">
+								@(reminderEnabled ? "Save reminder" : "Turn off reminder")
+							</button>
+							<p class="reminder-message" role="status">@reminderMessage</p>
+							<p class="reminder-note">Reminders appear while this app is open.</p>
+						</div>
 					</aside>
 				</div>
 			</section>
@@ -179,12 +197,16 @@
 
 @code {
 	private const string StorageKey = "cognia.moodEntries";
+	private const string ReminderStorageKey = "cognia.dailyReminder";
 	private int? selectedScore;
 	private string notes = "";
 	private string searchTerm = "";
 	private string activeCategory = "All reads";
 	private int rangeDays = 7;
 	private string saveMessage = "";
+	private TimeOnly? reminderTime = new(9, 0);
+	private string reminderMessage = "";
+	private bool reminderEnabled;
 	private List<MoodEntry> entries = [];
 	private Article? selectedArticle;
 
@@ -223,6 +245,17 @@
 			var saved = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
 			if (!string.IsNullOrWhiteSpace(saved))
 				entries = JsonSerializer.Deserialize<List<MoodEntry>>(saved) ?? [];
+
+			var savedReminder = await JS.InvokeAsync<string?>("localStorage.getItem", ReminderStorageKey);
+			if (!string.IsNullOrWhiteSpace(savedReminder))
+			{
+				var preferences = JsonSerializer.Deserialize<ReminderPreferences>(savedReminder, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+				if (preferences is not null && TimeOnly.TryParse(preferences.Time, out var savedTime))
+				{
+					reminderTime = savedTime;
+					reminderEnabled = true;
+				}
+			}
 		}
 		catch (Exception)
 		{
@@ -246,8 +279,43 @@
 			saveMessage = "Check-in added for this visit. Browser storage is unavailable, so it will not be saved after you leave.";
 		}
 
+		try
+		{
+			await JS.InvokeVoidAsync("cogniaReminders.notifyCheckInSaved");
+		}
+		catch (JSException)
+		{
+		}
+
 		selectedScore = null;
 		notes = "";
+	}
+
+	private async Task SaveReminderAsync()
+	{
+		try
+		{
+			if (!reminderEnabled)
+			{
+				await JS.InvokeVoidAsync("cogniaReminders.disable");
+				reminderMessage = "Daily reminder turned off.";
+				return;
+			}
+
+			var reminderTimeText = reminderTime?.ToString("HH:mm") ?? "09:00";
+			var permission = await JS.InvokeAsync<string>("cogniaReminders.enable", reminderTimeText);
+			reminderMessage = permission switch
+			{
+				"granted" => $"Reminder saved for {reminderTime?.ToString("h:mm tt")}.",
+				"unsupported" => "This browser does not support notifications.",
+				"invalid" => "Choose a valid reminder time.",
+				_ => "Allow notifications in your browser to set a reminder."
+			};
+		}
+		catch (JSException)
+		{
+			reminderMessage = "Browser notifications are unavailable.";
+		}
 	}
 
 	private void OpenArticle(Article article)
@@ -260,6 +328,11 @@
 		public DateTime Date { get; set; }
 		public int Score { get; set; }
 		public string Note { get; set; } = "";
+	}
+
+	private sealed class ReminderPreferences
+	{
+		public string Time { get; set; } = "";
 	}
 
 	private sealed record Article(string Category, string Title, string Summary, int ReadTime, string Kind, string ImageClass, string ImageAlt, string Body);
