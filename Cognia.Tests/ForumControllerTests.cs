@@ -1,4 +1,5 @@
 using Cognia.API.Controllers;
+using Cognia.API.Services;
 using Cognia.Shared.Models;
 using Microsoft.AspNetCore.Mvc;
 using Xunit;
@@ -169,7 +170,7 @@ public class ForumControllerTests
     }
 
     [Fact]
-    public void AddReply_ValidRequest_ReturnsOkWithReply()
+    public async Task AddReply_ValidRequest_ReturnsOkWithReply()
     {
         // Arrange
         var request = new CreateForumReplyRequest
@@ -181,7 +182,7 @@ public class ForumControllerTests
         };
 
         // Act
-        var result = _controller.AddReply(1, request);
+        var result = await _controller.AddReply(1, request);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
@@ -191,7 +192,27 @@ public class ForumControllerTests
     }
 
     [Fact]
-    public void AddReply_NonExistingThread_ReturnsNotFound()
+    public async Task AddReply_WaitsForNotificationToComplete()
+    {
+        var notificationService = new DelayedNotificationService();
+        var controller = new ForumController(notificationService);
+        var request = new CreateForumReplyRequest
+        {
+            ThreadId = 1,
+            Author = "Josephine",
+            Content = "A supportive reply"
+        };
+
+        var replyTask = controller.AddReply(1, request);
+
+        Assert.False(replyTask.IsCompleted);
+        notificationService.Complete();
+        await replyTask;
+        Assert.True(notificationService.WasCalled);
+    }
+
+    [Fact]
+    public async Task AddReply_NonExistingThread_ReturnsNotFound()
     {
         // Arrange
         var request = new CreateForumReplyRequest
@@ -201,14 +222,14 @@ public class ForumControllerTests
         };
 
         // Act
-        var result = _controller.AddReply(9999, request);
+        var result = await _controller.AddReply(9999, request);
 
         // Assert
         Assert.IsType<NotFoundResult>(result.Result);
     }
 
     [Fact]
-    public void AddReply_EmptyContent_ReturnsBadRequest()
+    public async Task AddReply_EmptyContent_ReturnsBadRequest()
     {
         // Arrange
         var request = new CreateForumReplyRequest
@@ -218,10 +239,30 @@ public class ForumControllerTests
         };
 
         // Act
-        var result = _controller.AddReply(1, request);
+        var result = await _controller.AddReply(1, request);
 
         // Assert
         var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
         Assert.Equal("Reply content is required.", badRequest.Value);
+    }
+
+    private sealed class DelayedNotificationService : INotificationService
+    {
+        private readonly TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool WasCalled { get; private set; }
+
+        public Task SendForumNotificationAsync(NotificationMessage message, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task SendReplyNotificationAsync(string? author, bool isAnonymous, string content, CancellationToken cancellationToken = default)
+        {
+            WasCalled = true;
+            return completion.Task;
+        }
+
+        public void Complete() => completion.SetResult();
     }
 }

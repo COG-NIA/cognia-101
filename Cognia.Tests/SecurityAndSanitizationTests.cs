@@ -39,7 +39,7 @@ public class SecurityAndSanitizationTests
     }
 
     [Fact]
-    public void AddReply_TrimsWhitespaceFromReplyContent()
+    public async Task AddReply_TrimsWhitespaceFromReplyContent()
     {
         // Arrange
         var request = new CreateForumReplyRequest
@@ -50,7 +50,7 @@ public class SecurityAndSanitizationTests
         };
 
         // Act
-        var result = _controller.AddReply(1, request);
+        var result = await _controller.AddReply(1, request);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
