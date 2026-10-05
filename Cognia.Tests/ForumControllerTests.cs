@@ -209,6 +209,7 @@ public class ForumControllerTests
         notificationService.Complete();
         await replyTask;
         Assert.True(notificationService.WasCalled);
+        Assert.Equal(1, notificationService.ThreadId);
     }
 
     [Fact]
@@ -251,15 +252,17 @@ public class ForumControllerTests
         private readonly TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public bool WasCalled { get; private set; }
+        public int? ThreadId { get; private set; }
 
         public Task SendForumNotificationAsync(NotificationMessage message, CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;
         }
 
-        public Task SendReplyNotificationAsync(string? author, bool isAnonymous, string content, CancellationToken cancellationToken = default)
+        public Task SendReplyNotificationAsync(int threadId, string? author, bool isAnonymous, string content, CancellationToken cancellationToken = default)
         {
             WasCalled = true;
+            ThreadId = threadId;
             return completion.Task;
         }
 

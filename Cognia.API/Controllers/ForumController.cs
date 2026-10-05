@@ -159,7 +159,7 @@ public class ForumController : ControllerBase
 
         if (_notificationService is not null)
         {
-            await _notificationService.SendReplyNotificationAsync(reply.Author, reply.IsAnonymous, reply.Content, cancellationToken);
+            await _notificationService.SendReplyNotificationAsync(id, reply.Author, reply.IsAnonymous, reply.Content, cancellationToken);
         }
 
         return Ok(reply);

@@ -190,9 +190,14 @@
 
         hubConnection.On<NotificationMessage>("ReceiveNotification", async message =>
         {
+            if (message.Type != "forum-reply" || message.ThreadId is not int threadId)
+            {
+                return;
+            }
+
             await InvokeAsync(async () =>
             {
-                await LoadForumAsync();
+                await RefreshThreadAsync(threadId);
                 StateHasChanged();
             });
         });
@@ -257,6 +262,30 @@
             allThreads.Add(sampleThread);
             selectedThread = sampleThread;
             FilterByCategory("All");
+        }
+    }
+
+    private async Task RefreshThreadAsync(int threadId)
+    {
+        try
+        {
+            var thread = await Http.GetFromJsonAsync<ForumThread>($"api/forum/threads/{threadId}");
+            var index = allThreads.FindIndex(item => item.Id == threadId);
+            if (thread is null || index < 0)
+            {
+                return;
+            }
+
+            allThreads[index] = thread;
+            if (selectedThread?.Id == threadId)
+            {
+                selectedThread = thread;
+            }
+
+            FilterByCategory(selectedCategory);
+        }
+        catch (HttpRequestException)
+        {
         }
     }
 

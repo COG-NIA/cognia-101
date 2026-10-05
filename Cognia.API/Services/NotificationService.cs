@@ -28,7 +28,7 @@ public class NotificationService : INotificationService
         return trimmedAuthor;
     }
 
-    public async Task SendReplyNotificationAsync(string? author, bool isAnonymous, string content, CancellationToken cancellationToken = default)
+    public async Task SendReplyNotificationAsync(int threadId, string? author, bool isAnonymous, string content, CancellationToken cancellationToken = default)
     {
         var authorName = BuildReplyMessage(author, isAnonymous);
         var safeAuthor = isAnonymous ? "Someone" : authorName;
@@ -38,6 +38,7 @@ public class NotificationService : INotificationService
             Type = "forum-reply",
             Author = safeAuthor,
             IsAnonymous = isAnonymous,
+            ThreadId = threadId,
             Message = isAnonymous ? "A new anonymous reply was posted." : $"{safeAuthor} replied to the forum.",
             CreatedAt = DateTime.UtcNow
         };

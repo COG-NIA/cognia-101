@@ -23,11 +23,14 @@ public class NotificationServiceTests
         var service = new NotificationService(new FakeHubContext(clients), NullLogger<NotificationService>.Instance);
         const string secretReply = "The password for the portal is 'hunter2'";
 
-        await service.SendReplyNotificationAsync("Joel Nathan", true, secretReply);
+        await service.SendReplyNotificationAsync(7, "Joel Nathan", true, secretReply);
 
         var message = clients.LastMessage;
         Assert.NotNull(message);
+        Assert.Equal(NotificationHub.ForumGroup, clients.LastGroup);
+        Assert.Equal("ReceiveNotification", clients.LastMethod);
         Assert.Equal("Someone", message.Author);
+        Assert.Equal(7, message.ThreadId);
         Assert.True(message.IsAnonymous);
         Assert.Equal("A new anonymous reply was posted.", message.Message);
         Assert.DoesNotContain(secretReply, message.Message, StringComparison.Ordinal);
@@ -48,12 +51,18 @@ public class NotificationServiceTests
     private sealed class FakeHubClients : IHubClients
     {
         public NotificationMessage? LastMessage { get; internal set; }
+        public string? LastGroup { get; internal set; }
+        public string? LastMethod { get; internal set; }
 
         public IClientProxy All => throw new NotSupportedException();
         public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
         public IClientProxy Client(string connectionId) => throw new NotSupportedException();
         public IClientProxy Clients(IReadOnlyList<string> connectionIds) => throw new NotSupportedException();
-        public IClientProxy Group(string groupName) => new FakeClientProxy(this);
+        public IClientProxy Group(string groupName)
+        {
+            LastGroup = groupName;
+            return new FakeClientProxy(this);
+        }
         public IClientProxy GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => throw new NotSupportedException();
         public IClientProxy Groups(IReadOnlyList<string> groupNames) => throw new NotSupportedException();
         public IClientProxy User(string userId) => throw new NotSupportedException();
@@ -71,6 +80,7 @@ public class NotificationServiceTests
 
         public Task SendCoreAsync(string method, object?[] args, CancellationToken cancellationToken = default)
         {
+            _clients.LastMethod = method;
             _clients.LastMessage = Assert.IsType<NotificationMessage>(args[0]);
             return Task.CompletedTask;
         }
