@@ -1,260 +1,119 @@
 # Cognia - Mental Wellness Support System
 
-A comprehensive web application for mental wellness tracking, professional therapy access, and anonymous peer-to-peer community support.
+Cognia is a .NET 10 demo application for personal wellbeing check-ins, self-help reading, a peer forum, and therapist session booking. It consists of a Blazor WebAssembly client and an ASP.NET Core Web API.
 
-## Tech Stack
+## Current Features
 
-- **Backend**: ASP.NET Core Web API (.NET 10.0)
-- **Frontend**: Blazor WebAssembly
-- **Real-time**: SignalR
-- **Database**: SQL Server with Entity Framework Core
-- **Authentication**: ASP.NET Identity with JWT
-- **Payment**: Paystack API
-- **Video**: Jitsi integration
-- **Deployment**: Azure / Docker
+- Mood check-ins, notes, and 7/30-day charts. Check-ins are stored in the browser's local storage.
+- Searchable and categorized self-help reading in the client.
+- Forum threads, replies, and categories through the API.
+- Therapist directory, session booking, payment history, and Paystack payment initialization/verification.
+- Jitsi meeting links for confirmed sessions.
+
+## Technology
+
+- .NET 10 and ASP.NET Core Web API
+- Blazor WebAssembly
+- Paystack API integration with a local sandbox fallback
+- Jitsi meeting links
 
 ## Project Structure
 
 ```
-Cognia/
-├── Cognia.sln                 # Solution file
-├── Cognia.API/                # Backend Web API
-│   ├── Controllers/           # API controllers
-│   ├── Models/                # Data models
-│   ├── Data/                  # DbContext and migrations
-│   ├── Services/              # Business logic services
-│   └── Hubs/                  # SignalR hubs
-├── Cognia.Client/             # Blazor WebAssembly frontend
-│   ├── Pages/                 # Blazor pages
-│   ├── Components/            # Reusable components
-│   └── Services/              # Client-side services
-└── Cognia.Shared/             # Shared models and DTOs
-    └── Models/                # Shared data models
+Cognia.slnx
+Cognia.API/       ASP.NET Core API, controllers, and Paystack service
+Cognia.Client/    Blazor WebAssembly pages and client services
+Cognia.Shared/    Models shared by the API and client
+Cognia.Tests/     xUnit tests
 ```
 
 ## Prerequisites
 
-- .NET 10.0 SDK
-- SQL Server (local or Azure)
-- Visual Studio 2022 or VS Code
-- Git
-- (Optional) Docker
-- (Optional) Azure account
+- .NET 10 SDK
+- A browser
+- Git, if cloning the repository
 
-## Setup Instructions
+## Run Locally
 
-### 1. Clone the Repository
+From the repository root, restore the solution:
 
 ```bash
-git clone <repository-url>
-cd Cognia
+dotnet restore Cognia.slnx
 ```
 
-### 2. Restore Dependencies
+Start the API in one terminal using its HTTPS launch profile:
 
 ```bash
-dotnet restore
+dotnet run --project Cognia.API/Cognia.API.csproj --launch-profile https
 ```
 
-### 3. Configure Database
+The API listens at `https://localhost:7214`, which is the address configured in the client. Trust the local ASP.NET Core development certificate if prompted or if the browser reports a certificate error.
 
-#### Option A: Local SQL Server
-
-1. Install SQL Server Express or Developer Edition
-2. Create a new database named `CogniaDB`
-3. Update connection string in `Cognia.API/appsettings.json`:
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Database=CogniaDB;Trusted_Connection=True;TrustServerCertificate=True;"
-  }
-}
-```
-
-#### Option B: Azure SQL Server
-
-1. Create an Azure SQL Server and database
-2. Update connection string in `Cognia.API/appsettings.json`:
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=tcp:<server-name>.database.windows.net,1433;Database=CogniaDB;User ID=<username>;Password=<password>;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
-  }
-}
-```
-
-### 4. Run Database Migrations
+Start the client in a second terminal:
 
 ```bash
-cd Cognia.API
-dotnet ef migrations add InitialCreate
-dotnet ef database update
+dotnet run --project Cognia.Client/Cognia.Client.csproj --launch-profile http
 ```
 
-### 5. Configure Environment Variables
+Open `http://localhost:5000`.
 
-Create `Cognia.API/appsettings.Development.json`:
+## Payments
 
-```json
-{
-  "JwtSettings": {
-    "SecretKey": "your-super-secret-key-at-least-32-characters-long",
-    "Issuer": "Cognia",
-    "Audience": "CogniaUsers",
-    "ExpiryInMinutes": 60
-  },
-  "Paystack": {
-    "PublicKey": "your-paystack-public-key",
-    "SecretKey": "your-paystack-secret-key"
-  },
-  "Jitsi": {
-    "BaseUrl": "https://meet.jit.si"
-  }
-}
-```
-
-### 6. Run the Backend API
+The API reads Paystack settings from the `Paystack:SecretKey` configuration value. For local development, use .NET user secrets rather than committing credentials:
 
 ```bash
-cd Cognia.API
-dotnet run
+dotnet user-secrets init --project Cognia.API/Cognia.API.csproj
+dotnet user-secrets set "Paystack:SecretKey" "your-paystack-test-secret-key" --project Cognia.API/Cognia.API.csproj
 ```
 
-The API will run on `https://localhost:5001`
+When a Paystack key is not configured, or the Paystack request fails, the API payment service returns a sandbox simulation. Do not use this fallback or test credentials for real transactions.
 
-### 7. Run the Frontend (Blazor)
-
-Open a second terminal at the repository root. Restore and run the Blazor client:
-
-```bash
-cd Cognia.Client
-dotnet restore
-dotnet run --launch-profile http
-```
-
-Open `http://localhost:5000` in your browser. Keep this terminal running while using the frontend.
-
-## Default Admin Account
-
-After running the application and seeding the database:
-
-- **Username**: `admin@cognia.com`
-- **Password**: `Admin@123`
-
-**Important**: Change the default admin password immediately after first login.
-
-## Features
-
-### Mood Tracker
-- Log daily mood entries (happy, anxious, stressed, neutral)
-- Add optional trigger notes
-- View weekly/monthly mood trend charts
-- Self-awareness dashboard
-
-### Self-Help Hub
-- Curated articles on mental wellness
-- Breathing exercises and coping strategies
-- Categorized content (stress, sleep, grief, academic pressure)
-- Accessible without login
-
-### Safe Space Forum
-- Anonymous peer-to-peer community
-- Topic threads with real-time replies
-- Emoji reactions
-- Trigger warnings
-- Admin content moderation
-
-### Therapist Sessions
-- Browse verified therapist profiles
-- Book paid 1-on-1 sessions
-- Pay via Paystack (MTN MoMo / card)
-- Integrated video sessions via Jitsi
-
-### Anonymous Support
-- Submit anonymous help requests
-- Requests routed to counsellors
-- Daily check-in notifications
-- Consistent wellbeing tracking
-
-## API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - User login
-- `POST /api/auth/logout` - User logout
-
-### Mood Tracker
-- `GET /api/mood` - Get user's mood entries
-- `POST /api/mood` - Log new mood entry
-- `GET /api/mood/trends` - Get mood trends
-
-### Self-Help Hub
-- `GET /api/articles` - Get all articles
-- `GET /api/articles/{id}` - Get specific article
-- `GET /api/articles/categories` - Get article categories
+## API Routes
 
 ### Forum
-- `GET /api/forum/threads` - Get all threads
-- `POST /api/forum/threads` - Create new thread
-- `GET /api/forum/threads/{id}/replies` - Get thread replies
-- `POST /api/forum/threads/{id}/replies` - Add reply
 
-### Therapist Sessions
-- `GET /api/therapists` - Get all therapists
-- `GET /api/therapists/{id}` - Get therapist profile
-- `POST /api/sessions` - Book a session
-- `POST /api/payments` - Process payment
+- `GET /api/forum/threads`
+- `GET /api/forum/categories`
+- `GET /api/forum/threads/{id}`
+- `GET /api/forum/threads/{id}/replies`
+- `POST /api/forum/threads`
+- `POST /api/forum/threads/{id}/replies`
+
+### Therapists
+
+- `GET /api/therapists` (optional `specialization` query parameter)
+- `GET /api/therapists/{id}`
+
+### Sessions
+
+- `GET /api/sessions`
+- `GET /api/sessions/user/{userId}`
+- `GET /api/sessions/{id}`
+- `POST /api/sessions`
+
+### Payments
+
+- `GET /api/payments`
+- `POST /api/payments/initialize`
+- `GET /api/payments/verify/{reference}`
+
+OpenAPI is available from the API in Development at `/openapi/v1.json`.
 
 ## Development
 
-### Running Tests
+Run the tests and build the solution from the repository root:
 
 ```bash
-dotnet test
+dotnet test Cognia.slnx
+dotnet build Cognia.slnx -c Release
 ```
 
-### Code Formatting
+## Demo Limitations
 
-```bash
-dotnet format
-```
-
-### Building for Production
-
-```bash
-dotnet build -c Release
-```
-
-## Deployment
-
-### Azure Deployment
-
-1. Create Azure resources:
-   - Azure App Service (Backend)
-   - Azure Static Web App (Frontend)
-   - Azure SQL Server
-
-2. Configure environment variables in Azure
-
-3. Deploy from GitHub:
-   ```bash
-   git push origin main
-   ```
-
-### Docker Deployment
-
-```bash
-# Build backend image
-docker build -t cognia-api -f Cognia.API/Dockerfile .
-
-# Build frontend image
-docker build -t cognia-client -f Cognia.Client/Dockerfile .
-
-# Run containers
-docker-compose up
-```
+- Forum threads, therapist sessions, and payment records are held in server memory and reset when the API restarts.
+- The client has mock therapist/session/payment fallbacks when the API is unavailable.
+- Mood entries use browser local storage; they are not sent to the API.
+- Authentication, authorization, database persistence, and production deployment configuration are not implemented.
 
 ## Team
 
