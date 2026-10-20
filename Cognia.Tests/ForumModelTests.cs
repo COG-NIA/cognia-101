@@ -14,7 +14,7 @@ public class ForumModelTests
         // Assert
         Assert.Equal(string.Empty, thread.Title);
         Assert.Equal("General", thread.Category);
-        Assert.Equal("Guest", thread.Author);
+        Assert.Equal(string.Empty, thread.Author);
         Assert.Equal(string.Empty, thread.Content);
         Assert.False(thread.IsAnonymous);
         Assert.NotNull(thread.Replies);
@@ -29,7 +29,7 @@ public class ForumModelTests
         var reply = new ForumReply();
 
         // Assert
-        Assert.Equal("Guest", reply.Author);
+        Assert.Equal(string.Empty, reply.Author);
         Assert.Equal(string.Empty, reply.Content);
         Assert.False(reply.IsAnonymous);
         Assert.True((DateTime.UtcNow - reply.CreatedAt).TotalSeconds < 5);

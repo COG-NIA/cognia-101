@@ -1,6 +1,7 @@
 @page "/forum"
 @using Cognia.Shared.Models
 @inject HttpClient Http
+@inject AuthService AuthService
 
 <PageTitle>Safe Space Forum</PageTitle>
 
@@ -10,7 +11,14 @@
             <p class="eyebrow">Community</p>
             <h1>Safe Space Forum</h1>
         </div>
-        <button class="primary-button" @onclick="ToggleComposer">New topic</button>
+        @if (isAuthenticated)
+        {
+            <button class="primary-button" @onclick="ToggleComposer">New topic</button>
+        }
+        else
+        {
+            <a class="primary-button" href="/login">Sign in to post</a>
+        }
     </div>
 
     @if (categories.Count > 0)
@@ -23,6 +31,11 @@
                 </button>
             }
         </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(loadError))
+    {
+        <p role="alert">@loadError</p>
     }
 
     @if (showComposer)
@@ -45,11 +58,6 @@
                             }
                         </InputSelect>
                     </div>
-                </div>
-
-                <div class="field-group">
-                    <label>Name</label>
-                    <InputText @bind-Value="newThread.Author" />
                 </div>
 
                 <div class="field-group">
@@ -138,13 +146,11 @@
                         }
                     </div>
 
+                    @if (isAuthenticated)
+                    {
                     <EditForm Model="newReply" OnValidSubmit="ReplyAsync">
                         <div class="composer-card nested">
                             <h3>Reply</h3>
-                            <div class="field-group">
-                                <label>Your name</label>
-                                <InputText @bind-Value="newReply.Author" />
-                            </div>
                             <div class="field-group">
                                 <label>Reply</label>
                                 <InputTextArea @bind-Value="newReply.Content" rows="4" />
@@ -156,6 +162,7 @@
                             <button class="primary-button" type="submit">Send reply</button>
                         </div>
                     </EditForm>
+                    }
                 </div>
             }
         </aside>
@@ -169,16 +176,20 @@
     private ForumThread? selectedThread;
     private string selectedCategory = "All";
     private bool showComposer;
-    private readonly CreateForumThreadRequest newThread = new() { Category = "General", Author = "Guest" };
-    private readonly CreateForumReplyRequest newReply = new() { Author = "Guest" };
+    private string loadError = string.Empty;
+    private readonly CreateForumThreadRequest newThread = new() { Category = "General" };
+    private readonly CreateForumReplyRequest newReply = new();
+    private bool isAuthenticated;
 
     protected override async Task OnInitializedAsync()
     {
+        isAuthenticated = await AuthService.IsSignedInAsync();
         await LoadForumAsync();
     }
 
     private async Task LoadForumAsync()
     {
+        loadError = string.Empty;
         try
         {
             var categoriesResponse = await Http.GetFromJsonAsync<string[]>("api/forum/categories");
@@ -197,36 +208,13 @@
                 selectedThread ??= allThreads.FirstOrDefault();
             }
         }
-        catch
+        catch (HttpRequestException)
         {
-            categories.Clear();
-            categories.AddRange(ForumCategories.All);
-
-            var sampleThread = new ForumThread
-            {
-                Id = 1,
-                Title = "How are you handling academic stress this semester?",
-                Category = "Academic Pressure",
-                Author = "Student Support",
-                Content = "I am trying to balance assignments, deadlines, and rest. What has helped you feel more in control when the workload feels overwhelming?",
-                CreatedAt = DateTime.UtcNow.AddDays(-2),
-                Replies =
-                [
-                    new ForumReply
-                    {
-                        Id = 1,
-                        ThreadId = 1,
-                        Author = "Maya",
-                        Content = "I started using a simple daily plan and blocking off one low-pressure hour each day.",
-                        CreatedAt = DateTime.UtcNow.AddDays(-1)
-                    }
-                ]
-            };
-
             allThreads.Clear();
-            allThreads.Add(sampleThread);
-            selectedThread = sampleThread;
-            FilterByCategory("All");
+            categories.Clear();
+            filteredThreads.Clear();
+            selectedThread = null;
+            loadError = "Unable to load forum conversations. Check your connection and try again.";
         }
     }
 
@@ -265,7 +253,6 @@
         {
             newThread.Title = string.Empty;
             newThread.Content = string.Empty;
-            newThread.Author = "Guest";
             newThread.IsAnonymous = false;
             showComposer = false;
             await LoadForumAsync();
@@ -284,7 +271,6 @@
         if (response.IsSuccessStatusCode)
         {
             newReply.Content = string.Empty;
-            newReply.Author = "Guest";
             newReply.IsAnonymous = false;
             await LoadForumAsync();
         }

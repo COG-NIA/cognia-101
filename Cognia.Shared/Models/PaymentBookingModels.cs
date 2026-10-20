@@ -4,28 +4,28 @@ public class Therapist
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
-    public string Title { get; set; } = "Licensed Mental Health Counselor";
-    public string Specialization { get; set; } = "General Counseling";
+    public string Title { get; set; } = string.Empty;
+    public string Specialization { get; set; } = string.Empty;
     public string Bio { get; set; } = string.Empty;
-    public decimal HourlyRate { get; set; } = 150.00m; // GHS
-    public double Rating { get; set; } = 4.9;
-    public int ReviewCount { get; set; } = 24;
+    public decimal HourlyRate { get; set; }
+    public double Rating { get; set; }
+    public int ReviewCount { get; set; }
     public string ImageUrl { get; set; } = string.Empty;
-    public List<string> AvailableDays { get; set; } = new() { "Monday", "Wednesday", "Friday" };
-    public List<string> TimeSlots { get; set; } = new() { "09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM" };
-    public bool IsVerified { get; set; } = true;
-    public int YearsExperience { get; set; } = 8;
-    public List<string> Languages { get; set; } = new() { "English", "Twi" };
-    public string Education { get; set; } = "Ph.D. in Clinical Psychology, University of Ghana";
-    public string Approach { get; set; } = "Cognitive Behavioral Therapy (CBT), Mindfulness-Based Stress Reduction";
+    public List<string> AvailableDays { get; set; } = [];
+    public List<string> TimeSlots { get; set; } = [];
+    public bool IsVerified { get; set; }
+    public int YearsExperience { get; set; }
+    public List<string> Languages { get; set; } = [];
+    public string Education { get; set; } = string.Empty;
+    public string Approach { get; set; } = string.Empty;
 }
 
 public class TherapistSession
 {
     public int Id { get; set; }
-    public string UserId { get; set; } = "Guest";
-    public string ClientName { get; set; } = "Anonymous User";
-    public string ClientEmail { get; set; } = "user@cognia.com";
+    public string UserId { get; set; } = string.Empty;
+    public string ClientName { get; set; } = string.Empty;
+    public string ClientEmail { get; set; } = string.Empty;
     public int TherapistId { get; set; }
     public string TherapistName { get; set; } = string.Empty;
     public DateTime SessionDate { get; set; } = DateTime.Today.AddDays(1);
@@ -44,8 +44,8 @@ public class PaymentRecord
 {
     public int Id { get; set; }
     public int SessionId { get; set; }
-    public string UserId { get; set; } = "Guest";
-    public string ClientEmail { get; set; } = "user@cognia.com";
+    public string UserId { get; set; } = string.Empty;
+    public string ClientEmail { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public string Currency { get; set; } = "GHS";
     public string PaymentReference { get; set; } = string.Empty;

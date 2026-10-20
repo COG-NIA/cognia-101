@@ -1,91 +1,121 @@
+using System.Security.Claims;
+using Cognia.API.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Driver;
 using Cognia.Shared.Models;
 using Cognia.API.Services;
 
 namespace Cognia.API.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
-public class PaymentsController : ControllerBase
+public sealed class PaymentsController : ControllerBase
 {
-    private static readonly List<PaymentRecord> Payments = new();
-    private static int _nextPaymentId = 1;
-
+    private readonly CogniaMongoDatabase _database;
     private readonly IPaystackService _paystackService;
 
-    public PaymentsController(IPaystackService paystackService)
+    public PaymentsController(CogniaMongoDatabase database, IPaystackService paystackService)
     {
+        _database = database;
         _paystackService = paystackService;
     }
 
     [HttpGet]
-    public ActionResult<List<PaymentRecord>> GetPaymentHistory()
+    public async Task<ActionResult<List<PaymentRecord>>> GetPaymentHistory(CancellationToken cancellationToken)
     {
-        return Ok(Payments.OrderByDescending(p => p.CreatedAt).ToList());
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        var payments = await _database.Payments.Find(payment => payment.UserId == userId.ToString())
+            .SortByDescending(payment => payment.CreatedAt)
+            .ToListAsync(cancellationToken);
+        return Ok(payments);
     }
 
     [HttpPost("initialize")]
-    public async Task<ActionResult<PaystackInitializeResponse>> InitializePayment([FromBody] InitializePaymentRequest request)
+    public async Task<ActionResult<PaystackInitializeResponse>> InitializePayment(
+        [FromBody] InitializePaymentRequest request, CancellationToken cancellationToken)
     {
-        var session = SessionsController.GetSessionById(request.SessionId);
-        if (session == null)
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        var session = await _database.Sessions.Find(item =>
+                item.Id == request.SessionId && item.UserId == userId.ToString())
+            .FirstOrDefaultAsync(cancellationToken);
+        if (session is null) return NotFound(new { message = "Session not found." });
+
+        var response = await _paystackService.InitializeTransactionAsync(new InitializePaymentRequest
         {
-            return NotFound(new { message = $"Session ID {request.SessionId} not found." });
-        }
+            SessionId = session.Id,
+            Email = session.ClientEmail,
+            Amount = session.TotalAmount,
+            CallbackUrl = request.CallbackUrl
+        });
+        if (!response.Status || response.Data is null)
+            return StatusCode(StatusCodes.Status502BadGateway, response);
 
-        var response = await _paystackService.InitializeTransactionAsync(request);
-        if (response.Status && response.Data != null)
+        var payment = new PaymentRecord
         {
-            var paymentRecord = new PaymentRecord
-            {
-                Id = _nextPaymentId++,
-                SessionId = request.SessionId,
-                UserId = session.UserId,
-                ClientEmail = request.Email,
-                Amount = request.Amount,
-                Currency = "GHS",
-                PaymentReference = response.Data.Reference,
-                PaymentChannel = "Mobile Money / Card",
-                PaymentStatus = "Pending",
-                PaystackAccessCode = response.Data.AccessCode,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            Payments.Add(paymentRecord);
-
-            // Update session with payment reference
-            session.PaymentReference = response.Data.Reference;
-            SessionsController.UpdateSession(session);
-        }
+            Id = await _database.NextIdAsync("payments", cancellationToken),
+            SessionId = session.Id,
+            UserId = userId.ToString(),
+            ClientEmail = session.ClientEmail,
+            Amount = session.TotalAmount,
+            Currency = "GHS",
+            PaymentReference = response.Data.Reference,
+            PaymentChannel = "Mobile Money / Card",
+            PaymentStatus = "Pending",
+            PaystackAccessCode = response.Data.AccessCode,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _database.Payments.InsertOneAsync(payment, cancellationToken: cancellationToken);
+        await _database.Sessions.UpdateOneAsync(
+            item => item.Id == session.Id,
+            Builders<TherapistSession>.Update.Set(item => item.PaymentReference, payment.PaymentReference),
+            cancellationToken: cancellationToken);
 
         return Ok(response);
     }
 
     [HttpGet("verify/{reference}")]
-    public async Task<ActionResult<PaystackVerifyResponse>> VerifyPayment(string reference)
+    public async Task<ActionResult<PaystackVerifyResponse>> VerifyPayment(string reference, CancellationToken cancellationToken)
     {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        var payment = await _database.Payments.Find(item =>
+                item.PaymentReference == reference && item.UserId == userId.ToString())
+            .FirstOrDefaultAsync(cancellationToken);
+        if (payment is null) return NotFound(new { message = "Payment not found." });
+
         var verifyResult = await _paystackService.VerifyTransactionAsync(reference);
-
-        var payment = Payments.FirstOrDefault(p => p.PaymentReference.Equals(reference, StringComparison.OrdinalIgnoreCase));
-        if (payment != null && verifyResult.Status)
+        if (verifyResult.Status &&
+            verifyResult.Data is { Status: "success" } verifiedData &&
+            string.Equals(verifiedData.Reference, payment.PaymentReference, StringComparison.Ordinal) &&
+            verifiedData.Amount == payment.Amount * 100)
         {
-            payment.PaymentStatus = "Success";
-            payment.PaidAt = DateTime.UtcNow;
-            if (!string.IsNullOrEmpty(verifyResult.Data?.Channel))
-            {
-                payment.PaymentChannel = verifyResult.Data.Channel;
-            }
+            await _database.Payments.UpdateOneAsync(
+                item => item.Id == payment.Id,
+                Builders<PaymentRecord>.Update
+                    .Set(item => item.PaymentStatus, "Success")
+                    .Set(item => item.PaidAt, DateTime.UtcNow)
+                    .Set(item => item.PaymentChannel, verifiedData.Channel),
+                cancellationToken: cancellationToken);
+            await _database.Sessions.UpdateOneAsync(
+                item => item.Id == payment.SessionId && item.UserId == userId.ToString(),
+                Builders<TherapistSession>.Update
+                    .Set(item => item.Status, "Confirmed")
+                    .Set(item => item.MeetingLink, $"https://meet.jit.si/cognia-therapy-{reference[..Math.Min(12, reference.Length)]}"),
+                cancellationToken: cancellationToken);
         }
-
-        // Update corresponding session to Confirmed & Generate Jitsi Video Link
-        var allSessions = SessionsController.GetSessionById(payment?.SessionId ?? 0);
-        if (allSessions != null)
+        else
         {
-            allSessions.Status = "Confirmed";
-            allSessions.MeetingLink = $"https://meet.jit.si/cognia-therapy-{reference[..Math.Min(12, reference.Length)]}";
-            SessionsController.UpdateSession(allSessions);
+            return Ok(new PaystackVerifyResponse
+            {
+                Status = false,
+                Message = "Paystack did not confirm the expected payment reference and amount."
+            });
         }
 
         return Ok(verifyResult);
     }
+
+    private bool TryGetUserId(out int userId) =>
+        int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
 }

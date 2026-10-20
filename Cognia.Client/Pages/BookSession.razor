@@ -3,7 +3,7 @@
 @using Cognia.Client.Services
 @inject PaymentBookingService BookingService
 @inject NavigationManager NavManager
-@inject IJSRuntime JSRuntime
+@inject AuthService AuthService
 
 <PageTitle>Book 1-on-1 Therapy Consultation | Cognia</PageTitle>
 
@@ -19,7 +19,14 @@
         </section>
 
         <div class="content-wrap">
-            @if (isLoading)
+            @if (!isAuthenticated)
+            {
+                <div class="error-state">
+                    <p>Sign in or create an account before booking a session.</p>
+                    <a href="/login" class="action-btn primary">Sign in</a>
+                </div>
+            }
+            else if (isLoading)
             {
                 <div class="loading-state">
                     <p>Loading specialist details and available calendar schedule...</p>
@@ -84,13 +91,13 @@
                                 <label class="section-label">2. Select Consultation Duration</label>
                                 <div class="duration-pills">
                                     <button type="button" class="dur-pill @(bookingReq.DurationMinutes == 30 ? "selected" : "")" @onclick="() => SetDuration(30)">
-                                        ⏱️ 30 Mins <span class="dur-price">(GH₵ @((therapist.HourlyRate * 0.6m).ToString("F2")))</span>
+                                        ⏱️ 30 Mins <span class="dur-price">(GH₵ @((therapist.HourlyRate * 0.5m).ToString("F2")))</span>
                                     </button>
                                     <button type="button" class="dur-pill @(bookingReq.DurationMinutes == 60 ? "selected" : "")" @onclick="() => SetDuration(60)">
                                         ⏱️ 60 Mins (Standard) <span class="dur-price">(GH₵ @therapist.HourlyRate.ToString("F2"))</span>
                                     </button>
                                     <button type="button" class="dur-pill @(bookingReq.DurationMinutes == 90 ? "selected" : "")" @onclick="() => SetDuration(90)">
-                                        ⏱️ 90 Mins (In-Depth) <span class="dur-price">(GH₵ @((therapist.HourlyRate * 1.45m).ToString("F2")))</span>
+                                        ⏱️ 90 Mins (In-Depth) <span class="dur-price">(GH₵ @((therapist.HourlyRate * 1.5m).ToString("F2")))</span>
                                     </button>
                                 </div>
                             </div>
@@ -98,17 +105,7 @@
                             <!-- 3. Client Information -->
                             <div class="form-group">
                                 <label class="section-label">3. Client Contact Information</label>
-                                <div class="form-row">
-                                    <div class="input-field">
-                                        <label for="clientName">Your Full Name *</label>
-                                        <input id="clientName" type="text" class="input-control" @bind="bookingReq.ClientName" placeholder="e.g. Lois Osei-Bonsu" required />
-                                    </div>
-
-                                    <div class="input-field">
-                                        <label for="clientEmail">Email Address (For receipts & Video link) *</label>
-                                        <input id="clientEmail" type="email" class="input-control" @bind="bookingReq.ClientEmail" placeholder="e.g. lois@example.com" required />
-                                    </div>
-                                </div>
+                                <p>Your registered account name and email will be used for this booking.</p>
                             </div>
 
                             <!-- 4. Date & Time Selection -->
@@ -268,7 +265,7 @@
     .step-item.active .step-num { background: #2b6cb0; color: white; }
 
     .booking-layout { display: grid; grid-template-columns: 1fr 370px; gap: 1.75rem; margin-top: 1rem; }
-    @media (max-width: 900px) { .booking-layout { grid-template-columns: 1fr; } }
+    @@media (max-width: 900px) { .booking-layout { grid-template-columns: 1fr; } }
 
     .booking-card { background: white; border-radius: 20px; border: 1px solid #e2e8f0; padding: 1.75rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
     .card-title-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
@@ -280,7 +277,7 @@
     .form-group { margin-bottom: 1.5rem; }
 
     .mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem; }
-    @media (max-width: 600px) { .mode-grid { grid-template-columns: 1fr; } }
+    @@media (max-width: 600px) { .mode-grid { grid-template-columns: 1fr; } }
     .mode-card { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 1rem; cursor: pointer; transition: all 0.2s ease; text-align: center; }
     .mode-card:hover { border-color: #90cdf4; background: #ebf8ff; }
     .mode-card.selected { background: #ebf8ff; border-color: #3182ce; box-shadow: 0 0 0 3px rgba(49,130,206,0.2); }
@@ -295,7 +292,7 @@
     .dur-price { font-size: 0.8rem; font-weight: 600; opacity: 0.9; }
 
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
+    @@media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
     .input-field label { display: block; font-size: 0.82rem; font-weight: 700; color: #4a5568; margin-bottom: 0.35rem; }
     .input-control { width: 100%; padding: 0.75rem 0.9rem; border-radius: 10px; border: 1px solid #cbd5e0; font-size: 0.9rem; font-family: inherit; color: #2d3748; box-sizing: border-box; }
     .input-control:focus { outline: none; border-color: #3182ce; box-shadow: 0 0 0 3px rgba(49,130,206,0.15); }
@@ -362,20 +359,29 @@
     private BookSessionRequest bookingReq = new();
     private bool isLoading = true;
     private bool isSubmitting = false;
+    private bool isAuthenticated;
     private string? errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
-        therapist = await BookingService.GetTherapistByIdAsync(TherapistId);
-        if (therapist != null)
+        isAuthenticated = await AuthService.IsSignedInAsync();
+        if (isAuthenticated)
         {
-            bookingReq.TherapistId = therapist.Id;
-            bookingReq.SessionDate = DateTime.Today.AddDays(1);
-            bookingReq.DurationMinutes = 60;
-            bookingReq.SessionMode = "Encrypted Video Call";
-            if (therapist.TimeSlots.Any())
+            try
             {
-                bookingReq.TimeSlot = therapist.TimeSlots.First();
+                therapist = await BookingService.GetTherapistByIdAsync(TherapistId);
+                if (therapist != null)
+                {
+                    bookingReq.TherapistId = therapist.Id;
+                    bookingReq.SessionDate = DateTime.Today.AddDays(1);
+                    bookingReq.DurationMinutes = 60;
+                    bookingReq.SessionMode = "Encrypted Video Call";
+                    if (therapist.TimeSlots.Any()) bookingReq.TimeSlot = therapist.TimeSlots.First();
+                }
+            }
+            catch (HttpRequestException)
+            {
+                errorMessage = "Unable to load therapist details. Check your connection and try again.";
             }
         }
         isLoading = false;
@@ -406,13 +412,7 @@
     private decimal CalculateTotal()
     {
         if (therapist == null) return 150.00m;
-        var factor = bookingReq.DurationMinutes switch
-        {
-            30 => 0.60m,
-            90 => 1.45m,
-            _ => 1.00m
-        };
-        return Math.Round(therapist.HourlyRate * factor, 2);
+        return Math.Round(therapist.HourlyRate * bookingReq.DurationMinutes / 60m, 2);
     }
 
     private async Task ProcessBooking()
@@ -434,45 +434,31 @@
             var initReq = new InitializePaymentRequest
             {
                 SessionId = session.Id,
-                Email = bookingReq.ClientEmail,
                 Amount = CalculateTotal(),
                 CallbackUrl = $"{NavManager.BaseUri}payment-history"
             };
 
             var paystackRes = await BookingService.InitializePaymentAsync(initReq);
-            var refCode = paystackRes?.Data?.Reference ?? $"COGNIA-PAY-{Guid.NewGuid().ToString()[..8].ToUpper()}";
+            if (paystackRes?.Status != true || string.IsNullOrWhiteSpace(paystackRes.Data?.AuthorizationUrl))
+            {
+                errorMessage = paystackRes?.Message ?? "Unable to initialize payment.";
+                return;
+            }
 
-            var dotNetRef = DotNetObjectReference.Create(this);
-            try
-            {
-                await JSRuntime.InvokeVoidAsync("paystackInterop.payWithPaystack", "pk_test_cce97442fea16049dd3622d782b3984ad03cd27e", bookingReq.ClientEmail, CalculateTotal(), refCode, dotNetRef);
-            }
-            catch
-            {
-                // Fallback to direct redirect if JS interop fails
-                await BookingService.VerifyPaymentAsync(refCode);
-                NavManager.NavigateTo("/payment-history");
-            }
+            NavManager.NavigateTo(paystackRes.Data.AuthorizationUrl, forceLoad: true);
         }
-        catch (Exception ex)
+        catch (HttpRequestException)
         {
-            errorMessage = $"An unexpected error occurred: {ex.Message}";
+            errorMessage = "Unable to complete booking. Check your connection and configuration, then try again.";
+        }
+        catch (InvalidOperationException)
+        {
+            errorMessage = "The booking service returned an invalid response.";
+        }
+        finally
+        {
             isSubmitting = false;
         }
-    }
-
-    [JSInvokable]
-    public async Task OnPaymentSuccess(string reference)
-    {
-        await BookingService.VerifyPaymentAsync(reference);
-        NavManager.NavigateTo("/payment-history");
-    }
-
-    [JSInvokable]
-    public void OnPaymentClosed()
-    {
-        isSubmitting = false;
-        StateHasChanged();
     }
 
     private string GetInitials(string name)

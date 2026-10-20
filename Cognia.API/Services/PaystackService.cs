@@ -18,95 +18,42 @@ public class PaystackService : IPaystackService
     public async Task<PaystackInitializeResponse> InitializeTransactionAsync(InitializePaymentRequest request)
     {
         var secretKey = _configuration["Paystack:SecretKey"];
-
-        // If Paystack secret key is configured, invoke live/test API endpoint
-        if (!string.IsNullOrWhiteSpace(secretKey) && !secretKey.Contains("your-paystack"))
+        if (string.IsNullOrWhiteSpace(secretKey))
         {
-            try
-            {
-                using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://api.paystack.co/transaction/initialize");
-                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", secretKey);
-
-                var amountInKobo = (int)(request.Amount * 100); // Convert GHS to subunits/kobo
-                var reference = $"COGNIA-{Guid.NewGuid().ToString()[..8].ToUpper()}";
-
-                var payload = new
-                {
-                    email = request.Email,
-                    amount = amountInKobo,
-                    currency = "GHS",
-                    reference = reference,
-                    callback_url = request.CallbackUrl
-                };
-
-                httpRequest.Content = JsonContent.Create(payload);
-                var response = await _httpClient.SendAsync(httpRequest);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var result = await response.Content.ReadFromJsonAsync<PaystackInitializeResponse>();
-                    if (result != null && result.Status) return result;
-                }
-            }
-            catch
-            {
-                // Fall back to sandbox simulation if network fails
-            }
+            return new PaystackInitializeResponse { Status = false, Message = "Paystack is not configured." };
         }
 
-        // Mock/Sandbox response for local testing and demo
-        var mockReference = $"COGNIA-{Guid.NewGuid().ToString()[..8].ToUpper()}";
-        return new PaystackInitializeResponse
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://api.paystack.co/transaction/initialize");
+        httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", secretKey);
+        httpRequest.Content = JsonContent.Create(new
         {
-            Status = true,
-            Message = "Payment initialized successfully (Sandbox Mode)",
-            Data = new PaystackInitializeData
-            {
-                AuthorizationUrl = $"https://checkout.paystack.com/sandbox-{mockReference}",
-                AccessCode = $"acc_{mockReference}",
-                Reference = mockReference
-            }
-        };
+            email = request.Email,
+            amount = (int)(request.Amount * 100),
+            currency = "GHS",
+            callback_url = request.CallbackUrl
+        });
+        using var response = await _httpClient.SendAsync(httpRequest);
+        var result = await response.Content.ReadFromJsonAsync<PaystackInitializeResponse>();
+        return response.IsSuccessStatusCode && result is not null
+            ? result
+            : new PaystackInitializeResponse { Status = false, Message = "Paystack payment initialization failed." };
     }
 
     public async Task<PaystackVerifyResponse> VerifyTransactionAsync(string reference)
     {
         var secretKey = _configuration["Paystack:SecretKey"];
-
-        if (!string.IsNullOrWhiteSpace(secretKey) && !secretKey.Contains("your-paystack"))
+        if (string.IsNullOrWhiteSpace(secretKey))
         {
-            try
-            {
-                using var httpRequest = new HttpRequestMessage(HttpMethod.Get, $"https://api.paystack.co/transaction/verify/{reference}");
-                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", secretKey);
-
-                var response = await _httpClient.SendAsync(httpRequest);
-                if (response.IsSuccessStatusCode)
-                {
-                    var result = await response.Content.ReadFromJsonAsync<PaystackVerifyResponse>();
-                    if (result != null && result.Status) return result;
-                }
-            }
-            catch
-            {
-                // Fall back to sandbox simulation if network fails
-            }
+            return new PaystackVerifyResponse { Status = false, Message = "Paystack is not configured." };
         }
 
-        // Mock verification success for local test references
-        return new PaystackVerifyResponse
-        {
-            Status = true,
-            Message = "Verification successful (Sandbox Mode)",
-            Data = new PaystackVerifyData
-            {
-                Status = "success",
-                Reference = reference,
-                Amount = 15000, // 150 GHS
-                GatewayResponse = "Approved",
-                Channel = "mobile_money",
-                PaidAt = DateTime.UtcNow.ToString("o")
-            }
-        };
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Get,
+            $"https://api.paystack.co/transaction/verify/{Uri.EscapeDataString(reference)}");
+        httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", secretKey);
+        using var response = await _httpClient.SendAsync(httpRequest);
+        var result = await response.Content.ReadFromJsonAsync<PaystackVerifyResponse>();
+        return response.IsSuccessStatusCode && result is not null
+            ? result
+            : new PaystackVerifyResponse { Status = false, Message = "Paystack payment verification failed." };
     }
 }

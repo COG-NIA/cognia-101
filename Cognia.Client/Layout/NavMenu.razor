@@ -1,3 +1,6 @@
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
 <header class="site-header">
     <a class="brand" href="/" aria-label="Cognia home">
         <span class="brand-mark" aria-hidden="true">c</span>
@@ -9,6 +12,30 @@
         <NavLink href="/forum">Safe Space Forum</NavLink>
         <NavLink href="/therapists">Therapists & Sessions</NavLink>
         <NavLink href="/payment-history">Payments</NavLink>
+        @if (isAuthenticated)
+        {
+            <button type="button" @onclick="SignOutAsync">Sign out</button>
+        }
+        else
+        {
+            <NavLink href="/login">Sign in</NavLink>
+            <NavLink href="/register">Create account</NavLink>
+        }
     </nav>
     <a class="header-action" href="/#check-in">Take a moment <span aria-hidden="true">↗</span></a>
 </header>
+
+@code {
+    private bool isAuthenticated;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await AuthService.IsSignedInAsync();
+    }
+
+    private async Task SignOutAsync()
+    {
+        await AuthService.SignOutAsync();
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+}

@@ -1,6 +1,7 @@
 ﻿@page "/"
-@using System.Text.Json
-@inject IJSRuntime JS
+@using Cognia.Shared.Models
+@inject HttpClient Http
+@inject AuthService AuthService
 
 <PageTitle>Cognia | Your wellbeing, in focus</PageTitle>
 
@@ -54,9 +55,13 @@
 								  aria-describedby="notes-hint"></textarea>
 						<div class="form-footer">
 							<span id="notes-hint">Only you can see your notes on this device.</span>
-							<button class="primary-button" type="submit" disabled="@(selectedScore is null)">Save check-in <span aria-hidden="true">→</span></button>
+							<button class="primary-button" type="submit" disabled="@(selectedScore is null || !isAuthenticated)">Save check-in <span aria-hidden="true">→</span></button>
 						</div>
 						<p class="save-message" role="status" aria-live="polite">@saveMessage</p>
+						@if (!isAuthenticated)
+						{
+							<p><a href="/login">Sign in</a> to save private check-ins to your account.</p>
+						}
 					</form>
 
 					<aside class="checkin-aside" aria-label="Check-in encouragement">
@@ -131,6 +136,10 @@
 					</label>
 				</div>
 
+				@if (!string.IsNullOrWhiteSpace(articleError))
+				{
+					<p role="alert">@articleError</p>
+				}
 				<div class="article-grid">
 					@foreach (var article in FilteredArticles)
 					{
@@ -139,7 +148,7 @@
 								<span class="article-category">@article.Category</span>
 							</div>
 							<div class="article-body">
-								<div class="article-meta"><span>@article.ReadTime MIN READ</span><span aria-hidden="true">·</span><span>@article.Kind</span></div>
+								<div class="article-meta"><span>@article.ReadTimeMinutes MIN READ</span><span aria-hidden="true">·</span><span>@article.Kind</span></div>
 								<h3>@article.Title</h3>
 								<p>@article.Summary</p>
 								<button class="article-link" type="button" @onclick="() => OpenArticle(article)">
@@ -160,7 +169,7 @@
 			{
 				<section class="reading-panel" aria-labelledby="reading-title" aria-live="polite">
 					<div class="reading-header">
-						<div><p class="eyebrow">@selectedArticle.Category · @selectedArticle.ReadTime MIN READ</p><h2 id="reading-title" tabindex="-1">@selectedArticle.Title</h2></div>
+						<div><p class="eyebrow">@selectedArticle.Category · @selectedArticle.ReadTimeMinutes MIN READ</p><h2 id="reading-title" tabindex="-1">@selectedArticle.Title</h2></div>
 						<button class="close-reading" type="button" aria-label="Close article" @onclick="() => selectedArticle = null">×</button>
 					</div>
 					<p>@selectedArticle.Body</p>
@@ -178,7 +187,6 @@
 	</div>
 
 @code {
-	private const string StorageKey = "cognia.moodEntries";
 	private int? selectedScore;
 	private string notes = "";
 	private string searchTerm = "";
@@ -186,7 +194,10 @@
 	private int rangeDays = 7;
 	private string saveMessage = "";
 	private List<MoodEntry> entries = [];
-	private Article? selectedArticle;
+	private List<WellnessArticle> articles = [];
+	private WellnessArticle? selectedArticle;
+	private bool isAuthenticated;
+	private string articleError = string.Empty;
 
 	private static readonly (int Score, string Label, string Face)[] Moods =
 	[
@@ -195,17 +206,7 @@
 
 	private static readonly string[] Categories = ["All reads", "Stress", "Sleep", "Grief", "Student life"];
 
-	private static readonly List<Article> Articles =
-	[
-		new("Stress", "When everything feels like too much", "A small reset for the moments when your to-do list gets louder than you do.", 4, "GUIDE", "calm", "Sunlight falling across a quiet green landscape", "Start with one thing. Not the whole list, just the next kind, possible thing. Put both feet on the floor and let your shoulders fall. Take one slow breath out, a little longer than the breath in. Then choose a task small enough to begin in two minutes. You do not need to solve the whole day at once. A pause is not falling behind; it is a way to find your footing again."),
-		new("Sleep", "A softer landing at the end of the day", "A few gentle ways to help your mind shift out of busy mode and into rest.", 5, "PRACTICE", "sleep", "A calm bedroom with warm evening light", "Rest does not always arrive on command. Try making the last part of your day a little quieter: dim a light, set tomorrow's first task on paper, or give yourself five minutes without a screen. If thoughts keep coming, you might tell yourself, 'I can return to this tomorrow.' Small cues of safety and routine can help the body understand that it is allowed to slow down."),
-		new("Student life", "You are more than your grades", "For the weeks when deadlines pile up and it gets hard to see past them.", 3, "REFLECTION", "study", "An open notebook and a cup beside a window", "When pressure builds, it can feel as though one result says everything about you. It does not. Your effort, curiosity, relationships, and the way you recover after a hard day are part of your story too. Try naming one thing you learned, not only what you finished. If school feels unmanageable, telling someone you trust is a practical first step, not a failure."),
-		new("Grief", "There is no timetable for missing someone", "Making room for a feeling that may change shape from one day to the next.", 4, "REFLECTION", "grief", "A quiet path through trees after rainfall", "Grief can be present in ordinary moments and unexpected places. You do not have to make it smaller or find the right words for it. Some people find comfort in a simple ritual, a memory shared with someone safe, or taking the day one hour at a time. If today is harder than yesterday, that does not erase the steps you have already taken. Support is allowed, whenever you need it."),
-		new("Stress", "A breathing pause you can take anywhere", "No special setup needed. Just one minute to arrive back in the present.", 2, "EXERCISE", "breath", "Leaves moving gently in soft afternoon light", "Let your jaw unclench and rest your hands somewhere comfortable. Breathe in through your nose if that feels okay, then breathe out slowly, like you are cooling a warm drink. Notice one thing you can see and one thing your body is touching. Repeat for a few rounds at your own pace. If focusing on your breath feels uncomfortable, try noticing the sounds around you instead."),
-		new("Student life", "Asking for help is a skill", "How to make the first conversation feel a little less daunting.", 4, "GUIDE", "support", "A sunlit bench in a peaceful garden", "You can begin simply: 'I have been having a hard time and could use someone to listen.' You do not need a complete explanation before reaching out. Think of one person who usually makes you feel respected, or a counsellor or support service at your school. You can also write down what you want them to know first. Reaching out is one way of looking after yourself.")
-	];
-
-	private IEnumerable<Article> FilteredArticles => Articles.Where(article =>
+	private IEnumerable<WellnessArticle> FilteredArticles => articles.Where(article =>
 		(activeCategory == "All reads" || article.Category == activeCategory) &&
 		(string.IsNullOrWhiteSpace(searchTerm) || article.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || article.Summary.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || article.Category.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)));
 
@@ -220,13 +221,27 @@
 	{
 		try
 		{
-			var saved = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
-			if (!string.IsNullOrWhiteSpace(saved))
-				entries = JsonSerializer.Deserialize<List<MoodEntry>>(saved) ?? [];
+			articles = await Http.GetFromJsonAsync<List<WellnessArticle>>("api/articles") ?? [];
 		}
-		catch (Exception)
+		catch (HttpRequestException)
 		{
-			saveMessage = "Browser storage is unavailable. Your check-ins will last until you close this page.";
+			articleError = "Unable to load reading resources. Check your connection and try again.";
+		}
+
+		isAuthenticated = await AuthService.IsSignedInAsync();
+		if (!isAuthenticated)
+		{
+			saveMessage = "Sign in to view and save your private check-ins.";
+			return;
+		}
+
+		try
+		{
+			entries = await Http.GetFromJsonAsync<List<MoodEntry>>("api/mood") ?? [];
+		}
+		catch (HttpRequestException)
+		{
+			saveMessage = "Unable to load your check-ins. Check your connection and try again.";
 		}
 	}
 
@@ -235,32 +250,31 @@
 		if (selectedScore is null)
 			return;
 
-		entries.Add(new MoodEntry { Date = DateTime.Today, Score = selectedScore.Value, Note = notes.Trim() });
 		try
 		{
-			await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, JsonSerializer.Serialize(entries));
+			using var response = await Http.PostAsJsonAsync("api/mood", new CreateMoodEntryRequest
+			{
+				Score = selectedScore.Value,
+				Note = notes.Trim()
+			});
+			response.EnsureSuccessStatusCode();
+			var entry = await response.Content.ReadFromJsonAsync<MoodEntry>();
+			if (entry is not null) entries.Add(entry);
 			saveMessage = "Check-in saved. Thank you for taking a moment for yourself.";
 		}
-		catch (Exception)
+		catch (HttpRequestException)
 		{
-			saveMessage = "Check-in added for this visit. Browser storage is unavailable, so it will not be saved after you leave.";
+			saveMessage = "Unable to save your check-in. Check your connection and try again.";
+			return;
 		}
 
 		selectedScore = null;
 		notes = "";
 	}
 
-	private void OpenArticle(Article article)
+	private void OpenArticle(WellnessArticle article)
 	{
 		selectedArticle = article;
 	}
 
-	private sealed class MoodEntry
-	{
-		public DateTime Date { get; set; }
-		public int Score { get; set; }
-		public string Note { get; set; } = "";
-	}
-
-	private sealed record Article(string Category, string Title, string Summary, int ReadTime, string Kind, string ImageClass, string ImageAlt, string Body);
 }

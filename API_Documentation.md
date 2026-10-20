@@ -1,22 +1,21 @@
 # Cognia API Documentation
-**Prepared by:** Akubia Edith Elorm (Documentation and Report Writing - ID: 22188216)  
 **Project:** Cognia (Student Mental Health Platform)  
-**Date:** October 5, 2026 
+**Updated:** October 20, 2026
 
 ---
 
 ## 1. Overview
 
-Cognia provides a RESTful backend API implemented using **ASP.NET Core Web API on .NET 10.0**.
+Cognia provides a REST API using **ASP.NET Core Web API on .NET 10**. MongoDB stores accounts, articles, forum threads, mood entries, therapist profiles, sessions, payments, and ID sequences.
 
 The API supports:
 
-* Authentication
-* Mood tracking
-* Self-help resources
-* Community forums
-* Therapist sessions
-* Payment processing
+* JWT account registration and login
+* Authenticated, per-account mood tracking
+* Public self-help articles
+* Public forum reads and authenticated posts/replies
+* Public therapist directory and authenticated bookings
+* Authenticated payment initialization/history/verification
 
 ---
 
@@ -25,7 +24,7 @@ The API supports:
 During local development, the backend API runs at:
 
 ```text
-https://localhost:5001
+https://localhost:7214
 ```
 
 Therefore, an endpoint such as:
@@ -40,9 +39,15 @@ is accessed locally through the API server.
 
 ## 3. Authentication
 
-Cognia uses **ASP.NET Identity** with **JWT authentication**.
+Cognia hashes passwords with ASP.NET Core's `PasswordHasher<T>` and issues JWT bearer tokens. Send protected requests with `Authorization: Bearer <token>`. Configure `MongoDb:ConnectionString` and a `Jwt:SigningKey` of at least 32 bytes using user-secrets locally or environment variables in hosting; do not commit secrets.
 
-### 3.1 Register User
+### 3.1 Bootstrap the First Administrator
+
+**Endpoint:** `POST /api/auth/bootstrap-admin`
+
+This one-time endpoint requires the `X-Admin-Bootstrap-Token` header to match `Admin:BootstrapToken`. The JSON body is `{ "email": "...", "displayName": "...", "password": "..." }`; passwords must be at least 12 characters. It returns an auth response and refuses to create another administrator once one exists. Use the administrator to add actual therapist and article records.
+
+### 3.2 Register User
 
 **Endpoint**
 
@@ -59,7 +64,7 @@ Creates a new Cognia user account.
 
 ---
 
-### 3.2 Login
+### 3.3 Login
 
 **Endpoint**
 
@@ -78,19 +83,7 @@ The login process uses JWT-based authentication.
 
 ---
 
-### 3.3 Logout
-
-**Endpoint**
-
-```http
-POST /api/auth/logout
-```
-
-**Purpose:**
-Logs the current user out of the application.
-
-**Method:** `POST`
-
+The browser client stores the token for the current tab session. Signing out removes that token client-side; there is no server logout endpoint.
 ---
 
 ## 4. Mood Tracker API
@@ -138,22 +131,7 @@ An optional trigger note may also be included.
 
 ---
 
-### 4.3 Get Mood Trends
-
-**Endpoint**
-
-```http
-GET /api/mood/trends
-```
-
-**Purpose:**
-Retrieves mood trend information used by the mood-tracking dashboard.
-
-**Method:** `GET`
-
-**Authentication:** Required.
-
-The frontend uses this information to display weekly and monthly mood trends.
+Mood scores are integers from 1 to 5. Requests store the authenticated account ID; a caller cannot read or write another user's entries.
 
 ---
 
@@ -197,25 +175,12 @@ Retrieves a specific article using its identifier.
 
 ---
 
-### 5.3 Get Article Categories
+### 5.3 Create Article
 
-**Endpoint**
+**Endpoint:** `POST /api/articles`
+**Authentication:** Admin role required.
 
-```http
-GET /api/articles/categories
-```
-
-**Purpose:**
-Retrieves the available article categories.
-
-**Method:** `GET`
-
-Documented categories include:
-
-* Stress
-* Sleep
-* Grief
-* Academic pressure
+The database contains no seeded articles. Add only approved, genuine content through this endpoint.
 
 ---
 
@@ -249,7 +214,7 @@ Creates a new forum discussion thread.
 
 **Method:** `POST`
 
-**Authentication:** Required.
+**Authentication:** Required. Author display name is derived from the account; `IsAnonymous` hides it in the forum UI.
 
 The forum supports anonymous peer-to-peer community discussions.
 
@@ -267,6 +232,8 @@ GET /api/forum/threads/{id}/replies
 Retrieves replies associated with a forum thread.
 
 **Method:** `GET`
+
+**Authentication:** Required. The author is derived from the account.
 
 **Path Parameter:**
 
@@ -295,7 +262,7 @@ Adds a reply to an existing forum thread.
 | --------- | ------------------------------ |
 | `id`      | Identifier of the forum thread |
 
-The forum also supports real-time communication through **SignalR**.
+Forum categories are predefined in the API. New threads and replies are stored in MongoDB.
 
 ---
 
@@ -310,7 +277,7 @@ GET /api/therapists
 ```
 
 **Purpose:**
-Retrieves available verified therapist profiles.
+Retrieves therapist profiles stored in MongoDB. The collection starts empty; there are no sample therapists.
 
 **Method:** `GET`
 
@@ -335,11 +302,32 @@ Retrieves the profile of a specific therapist.
 | --------- | --------------------------- |
 | `id`      | Identifier of the therapist |
 
+### 7.3 Add Therapist
+
+**Endpoint:** `POST /api/therapists`
+**Authentication:** Admin role required.
+
+Only enter real, authorized therapist details and mark `IsVerified` true after verification.
+
 ---
 
 ## 8. Session API
 
-### 8.1 Book Session
+All session routes require authentication and return only the signed-in user's sessions.
+
+### 8.1 Get My Sessions
+
+```http
+GET /api/sessions
+```
+
+### 8.2 Get My Session
+
+```http
+GET /api/sessions/{id}
+```
+
+### 8.3 Book Session
 
 **Endpoint**
 
@@ -352,50 +340,27 @@ Creates a therapist-session booking.
 
 **Method:** `POST`
 
-The booking process is associated with the therapist-session functionality and payment workflow.
+The server requires a therapist record from MongoDB and calculates the amount from that record. Session details are stored in MongoDB.
 
 ---
 
 ## 9. Payment API
 
-### 9.1 Process Payment
+### 9.1 Get My Payment History
 
-**Endpoint**
+`GET /api/payments` (authenticated; only the caller's records)
 
-```http
-POST /api/payments
-```
+### 9.2 Initialize Payment
 
-**Purpose:**
-Processes payment associated with a therapist session.
+`POST /api/payments/initialize` (authenticated)
 
-**Method:** `POST`
+The API uses its configured `Paystack:SecretKey`; amount and customer email are read from the owned session, not trusted from the client. Successful initialization creates a pending MongoDB payment record and returns Paystack's authorization URL.
 
-Cognia integrates with the **Paystack API** for payment processing.
+### 9.3 Verify Payment
 
-Supported payment options documented by the project include:
+`GET /api/payments/verify/{reference}` (authenticated; reference must belong to the caller)
 
-* MTN Mobile Money
-* Card payments
-
----
-
-## 10. Real-Time Communication
-
-Cognia uses **SignalR** for real-time forum functionality.
-
-The project contains a dedicated:
-
-```text
-Cognia.API/Hubs/
-```
-
-directory for SignalR hubs.
-
-The real-time system supports features such as:
-
-* Real-time forum replies
-* Real-time communication between connected clients
+The payment is marked successful and its session confirmed only when Paystack returns a successful status with the matching reference and amount. Missing configuration/provider errors do not produce a simulated payment.
 
 ---
 
@@ -417,14 +382,16 @@ The following standard HTTP status codes may be used by the API:
 
 ---
 
-## 12. API Security
+## 11. API Security
 
 Cognia uses:
 
-* **ASP.NET Identity**
+* MongoDB-backed account records and password hashes
 * **JWT authentication**
-* **Role-based authorization** where applicable
+* **Role-based authorization** for therapist/article authoring
+* Per-account filtering for mood, session, and payment records
+* A one-time configuration-token-protected admin bootstrap
 
 Protected endpoints should only be accessed by authenticated and authorized users.
 
-Sensitive credentials such as **JWT secrets** and **Paystack secret keys** must not be committed to source control.
+MongoDB connection strings, JWT signing keys, admin bootstrap tokens, and Paystack secrets must be configured through user-secrets locally and App Service settings in Azure. The database is intentionally empty on first startup.

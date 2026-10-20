@@ -1,83 +1,42 @@
 using Cognia.API.Controllers;
+using Cognia.API.Data;
 using Cognia.Shared.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
+using MongoDB.Driver;
 using Xunit;
 
 namespace Cognia.Tests;
 
 public class SecurityAndSanitizationTests
 {
-    private readonly ForumController _controller;
-
-    public SecurityAndSanitizationTests()
+    private static ForumController CreateController() => new(
+        new CogniaMongoDatabase(new MongoClient("mongodb://localhost:27017").GetDatabase("CogniaTests")))
     {
-        _controller = new ForumController();
-    }
+        ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+    };
 
     [Fact]
-    public void CreateThread_TrimsWhitespaceFromTitleAndContent()
+    public async Task CreateThread_ValidInputFromAnonymousCaller_IsRejected()
     {
-        // Arrange
-        var request = new CreateForumThreadRequest
+        var result = await CreateController().CreateThread(new CreateForumThreadRequest
         {
-            Title = "   Padded Title   ",
-            Content = "   Padded content body   ",
-            Category = "  Stress  ",
-            Author = "  Joel Nathan  "
-        };
+            Title = "A valid topic",
+            Content = "Only an authenticated account can publish this."
+        }, CancellationToken.None);
 
-        // Act
-        var result = _controller.CreateThread(request);
-
-        // Assert
-        var createdResult = Assert.IsType<CreatedAtActionResult>(result.Result);
-        var thread = Assert.IsType<ForumThread>(createdResult.Value);
-        Assert.Equal("Padded Title", thread.Title);
-        Assert.Equal("Padded content body", thread.Content);
-        Assert.Equal("  Stress  ", thread.Category); // Category untouched or custom
-        Assert.Equal("  Joel Nathan  ", thread.Author);
+        Assert.IsType<UnauthorizedResult>(result.Result);
     }
 
     [Fact]
-    public void AddReply_TrimsWhitespaceFromReplyContent()
+    public async Task AddReply_ValidInputFromAnonymousCaller_IsRejected()
     {
-        // Arrange
-        var request = new CreateForumReplyRequest
+        var result = await CreateController().AddReply(1, new CreateForumReplyRequest
         {
             ThreadId = 1,
-            Author = "Tester",
-            Content = "   Untrimmed response   "
-        };
+            Content = "Only an authenticated account can reply."
+        }, CancellationToken.None);
 
-        // Act
-        var result = _controller.AddReply(1, request);
-
-        // Assert
-        var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var reply = Assert.IsType<ForumReply>(okResult.Value);
-        Assert.Equal("Untrimmed response", reply.Content);
-    }
-
-    [Theory]
-    [InlineData("<script>alert('xss')</script>")]
-    [InlineData("SELECT * FROM Users;")]
-    [InlineData("<b>Bold text</b>")]
-    public void CreateThread_AcceptsInputWithoutCrashing(string rawInput)
-    {
-        // Arrange
-        var request = new CreateForumThreadRequest
-        {
-            Title = "Security Input Test",
-            Content = rawInput,
-            Author = "QA Security Test"
-        };
-
-        // Act
-        var result = _controller.CreateThread(request);
-
-        // Assert
-        var createdResult = Assert.IsType<CreatedAtActionResult>(result.Result);
-        var thread = Assert.IsType<ForumThread>(createdResult.Value);
-        Assert.Equal(rawInput, thread.Content);
+        Assert.IsType<UnauthorizedResult>(result.Result);
     }
 }

@@ -1,0 +1,47 @@
+@page "/register"
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Create account | Cognia</PageTitle>
+
+<main class="account-page">
+    <h1>Create an account</h1>
+    <form @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+        <label for="display-name">Display name</label>
+        <input id="display-name" autocomplete="name" @bind="displayName" required maxlength="80" />
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="email" @bind="email" required />
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="new-password" @bind="password" required minlength="12" />
+        <p>Use at least 12 characters. Choose a unique password.</p>
+        @if (!string.IsNullOrWhiteSpace(message)) { <p role="alert">@message</p> }
+        <button type="submit" disabled="@submitting">@(submitting ? "Creating account..." : "Create account")</button>
+    </form>
+    <p>Already registered? <a href="/login">Sign in</a>.</p>
+</main>
+
+@code {
+    private string displayName = string.Empty;
+    private string email = string.Empty;
+    private string password = string.Empty;
+    private string message = string.Empty;
+    private bool submitting;
+
+    private async Task SubmitAsync()
+    {
+        submitting = true;
+        try
+        {
+            message = await AuthService.RegisterAsync(email, displayName, password) ?? string.Empty;
+            if (string.IsNullOrEmpty(message)) Navigation.NavigateTo("/", forceLoad: true);
+        }
+        catch (HttpRequestException)
+        {
+            message = "Unable to reach the service. Try again later.";
+        }
+        finally
+        {
+            submitting = false;
+        }
+    }
+}

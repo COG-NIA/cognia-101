@@ -1,20 +1,24 @@
 # Cognia - Mental Wellness Support System
 
-Cognia is a .NET 10 demo application for personal wellbeing check-ins, self-help reading, a peer forum, and therapist session booking. It consists of a Blazor WebAssembly client and an ASP.NET Core Web API.
+Cognia is a .NET 10 application for personal wellbeing check-ins, self-help reading, a peer forum, and therapist session booking. It consists of a Blazor WebAssembly client and an ASP.NET Core Web API backed by MongoDB.
 
 ## Current Features
 
-- Mood check-ins, notes, and 7/30-day charts. Check-ins are stored in the browser's local storage.
-- Searchable and categorized self-help reading in the client.
-- Forum threads, replies, and categories through the API.
-- Therapist directory, session booking, payment history, and Paystack payment initialization/verification.
+- Account registration and sign-in with JWT authentication.
+- Private mood check-ins stored in MongoDB and displayed in 7/30-day charts.
+- Self-help articles stored in MongoDB and managed by administrators.
+- Forum threads and replies stored in MongoDB; posting requires an account.
+- Therapist directory, session booking, and payment history stored in MongoDB.
+- Paystack checkout and verification using the configured Paystack API key.
 - Jitsi meeting links for confirmed sessions.
 
 ## Technology
 
 - .NET 10 and ASP.NET Core Web API
 - Blazor WebAssembly
-- Paystack API integration with a local sandbox fallback
+- MongoDB.Driver
+- JWT bearer authentication
+- Paystack API integration
 - Jitsi meeting links
 
 ## Project Structure
@@ -41,6 +45,19 @@ From the repository root, restore the solution:
 dotnet restore Cognia.slnx
 ```
 
+Configure local secrets. Do not put connection strings, signing keys, bootstrap tokens, or Paystack keys in tracked `appsettings*.json` files:
+
+```powershell
+dotnet user-secrets init --project Cognia.API/Cognia.API.csproj
+dotnet user-secrets set "MongoDb:ConnectionString" "<your-rotated-mongodb-atlas-connection-string>" --project Cognia.API/Cognia.API.csproj
+dotnet user-secrets set "MongoDb:DatabaseName" "Cognia" --project Cognia.API/Cognia.API.csproj
+dotnet user-secrets set "Jwt:SigningKey" "<random-secret-at-least-32-bytes>" --project Cognia.API/Cognia.API.csproj
+dotnet user-secrets set "Admin:BootstrapToken" "<one-time-random-bootstrap-token>" --project Cognia.API/Cognia.API.csproj
+dotnet user-secrets set "Paystack:SecretKey" "<rotated-paystack-test-secret-key>" --project Cognia.API/Cognia.API.csproj
+```
+
+In MongoDB Atlas, allow the API host's outbound IP in Network Access and use a database user with access only to the Cognia database. The connection string's password must be URL-encoded if it contains reserved characters.
+
 Start the API in one terminal using its HTTPS launch profile:
 
 ```bash
@@ -57,18 +74,30 @@ dotnet run --project Cognia.Client/Cognia.Client.csproj --launch-profile http
 
 Open `http://localhost:5000`.
 
-## Payments
+## First Administrator
 
-The API reads Paystack settings from the `Paystack:SecretKey` configuration value. For local development, use .NET user secrets rather than committing credentials:
+The database starts empty. Create the first administrator once by calling `POST /api/auth/bootstrap-admin` with the `X-Admin-Bootstrap-Token` header set to `Admin:BootstrapToken` and a JSON body containing `email`, `displayName`, and a password of at least 12 characters. The endpoint is disabled after an admin account exists. Sign in at `/login`; use the resulting admin account to create actual therapist and article records through the admin-only `POST /api/therapists` and `POST /api/articles` endpoints.
 
-```bash
-dotnet user-secrets init --project Cognia.API/Cognia.API.csproj
-dotnet user-secrets set "Paystack:SecretKey" "your-paystack-test-secret-key" --project Cognia.API/Cognia.API.csproj
-```
-
-When a Paystack key is not configured, or the Paystack request fails, the API payment service returns a sandbox simulation. Do not use this fallback or test credentials for real transactions.
+For Azure, add these values under the API App Service's **Configuration** settings instead of user-secrets: `MongoDb__ConnectionString`, `MongoDb__DatabaseName`, `Jwt__SigningKey`, `Jwt__Issuer`, `Jwt__Audience`, `Admin__BootstrapToken`, `Paystack__SecretKey`, and `Cors__ClientOrigin`. Set the frontend's `ApiBaseUrl` in `Cognia.Client/wwwroot/appsettings.json` to the deployed API origin before publishing the client.
 
 ## API Routes
+
+### Accounts
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/bootstrap-admin` (one-time bootstrap token required)
+
+### Mood
+
+- `GET /api/mood` (authenticated; returns only the caller's entries)
+- `POST /api/mood` (authenticated)
+
+### Articles
+
+- `GET /api/articles`
+- `GET /api/articles/{id}`
+- `POST /api/articles` (Admin role required)
 
 ### Forum
 
@@ -76,8 +105,8 @@ When a Paystack key is not configured, or the Paystack request fails, the API pa
 - `GET /api/forum/categories`
 - `GET /api/forum/threads/{id}`
 - `GET /api/forum/threads/{id}/replies`
-- `POST /api/forum/threads`
-- `POST /api/forum/threads/{id}/replies`
+- `POST /api/forum/threads` (authenticated)
+- `POST /api/forum/threads/{id}/replies` (authenticated)
 
 ### Therapists
 
@@ -87,9 +116,8 @@ When a Paystack key is not configured, or the Paystack request fails, the API pa
 ### Sessions
 
 - `GET /api/sessions`
-- `GET /api/sessions/user/{userId}`
 - `GET /api/sessions/{id}`
-- `POST /api/sessions`
+- `POST /api/sessions` (authenticated)
 
 ### Payments
 
@@ -110,10 +138,9 @@ dotnet build Cognia.slnx -c Release
 
 ## Demo Limitations
 
-- Forum threads, therapist sessions, and payment records are held in server memory and reset when the API restarts.
-- The client has mock therapist/session/payment fallbacks when the API is unavailable.
-- Mood entries use browser local storage; they are not sent to the API.
-- Authentication, authorization, database persistence, and production deployment configuration are not implemented.
+- MongoDB starts with no sample users, therapists, articles, forum threads, or payment records. Add real content through the administrator APIs.
+- Paystack must be configured for checkout; missing configuration and provider failures return errors instead of fake successes.
+- Use HTTPS and rotate any credentials that have been shared or committed. Configure allowed frontend origin, MongoDB network access, and production secrets before public deployment.
 
 ## Team
 

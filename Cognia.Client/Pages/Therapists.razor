@@ -64,6 +64,10 @@
                         <p>Loading verified therapist directory...</p>
                     </div>
                 }
+                else if (!string.IsNullOrWhiteSpace(loadError))
+                {
+                    <div class="error-state" role="alert"><p>@loadError</p></div>
+                }
                 else if (!FilteredAndSortedTherapists.Any())
                 {
                     <div class="empty-state">
@@ -296,20 +300,17 @@
 @code {
     private List<Therapist> therapists = new();
     private bool isLoading = true;
+    private string loadError = string.Empty;
     private string? selectedCategory;
     private string searchTerm = string.Empty;
     private string sortBy = "rating";
     private Therapist? activeModalTherapist;
 
-    private readonly string[] Categories = new[]
-    {
-        "Anxiety & Depression",
-        "Academic & Career Pressure",
-        "Trauma & Emotional Resilience",
-        "Relationships & Self-Care",
-        "Stress & Burnout",
-        "Grief & Coping"
-    };
+    private IEnumerable<string> Categories => therapists
+        .Select(therapist => therapist.Specialization)
+        .Where(category => !string.IsNullOrWhiteSpace(category))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(category => category);
 
     private IEnumerable<Therapist> FilteredAndSortedTherapists
     {
@@ -339,8 +340,20 @@
     private async Task LoadTherapists()
     {
         isLoading = true;
-        therapists = await BookingService.GetTherapistsAsync(selectedCategory);
-        isLoading = false;
+        loadError = string.Empty;
+        try
+        {
+            therapists = await BookingService.GetTherapistsAsync(selectedCategory);
+        }
+        catch (HttpRequestException)
+        {
+            therapists = [];
+            loadError = "Unable to load the therapist directory. Check your connection and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     private async Task FilterCategory(string? cat)

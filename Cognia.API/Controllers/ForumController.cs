@@ -1,4 +1,8 @@
 using Cognia.Shared.Models;
+using Cognia.API.Data;
+using Cognia.API.Models;
+using Microsoft.AspNetCore.Authorization;
+using MongoDB.Driver;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Cognia.API.Controllers;
@@ -7,63 +11,17 @@ namespace Cognia.API.Controllers;
 [Route("api/forum")]
 public class ForumController : ControllerBase
 {
-    private static readonly List<ForumThread> Threads = new()
-    {
-        new ForumThread
-        {
-            Id = 1,
-            Title = "How are you handling academic stress this semester?",
-            Category = "Academic Pressure",
-            Author = "Student Support",
-            Content = "I am trying to balance assignments, deadlines, and rest. What has helped you feel more in control when the workload feels overwhelming?",
-            CreatedAt = DateTime.UtcNow.AddDays(-2),
-            Replies =
-            [
-                new ForumReply
-                {
-                    Id = 1,
-                    ThreadId = 1,
-                    Author = "Maya",
-                    Content = "I started using a simple daily plan and blocking off one low-pressure hour each day. It helps me reset instead of feeling behind all the time.",
-                    CreatedAt = DateTime.UtcNow.AddDays(-1)
-                },
-                new ForumReply
-                {
-                    Id = 2,
-                    ThreadId = 1,
-                    Author = "Anonymous",
-                    Content = "Taking short walks in between tasks has made a huge difference. I feel calmer and more focused afterwards.",
-                    CreatedAt = DateTime.UtcNow.AddHours(-8),
-                    IsAnonymous = true
-                }
-            ]
-        },
-        new ForumThread
-        {
-            Id = 2,
-            Title = "Sleep routine tips that actually work",
-            Category = "Sleep",
-            Author = "Night Owl",
-            Content = "I keep losing sleep because my mind starts spiraling at night. I would love to hear what bedtime habits others have found useful.",
-            CreatedAt = DateTime.UtcNow.AddDays(-5),
-            Replies =
-            [
-                new ForumReply
-                {
-                    Id = 3,
-                    ThreadId = 2,
-                    Author = "Patricia",
-                    Content = "Lowering the brightness of my screen and putting my phone on a charger outside the bedroom helped me sleep faster.",
-                    CreatedAt = DateTime.UtcNow.AddDays(-4)
-                }
-            ]
-        }
-    };
+    private readonly CogniaMongoDatabase _database;
+
+    public ForumController(CogniaMongoDatabase database) => _database = database;
 
     [HttpGet("threads")]
-    public ActionResult<IEnumerable<ForumThread>> GetThreads()
+    public async Task<ActionResult<IEnumerable<ForumThread>>> GetThreads(CancellationToken cancellationToken)
     {
-        return Ok(Threads.OrderByDescending(t => t.CreatedAt).ToList());
+        var threads = await _database.ForumThreads.Find(FilterDefinition<ForumThread>.Empty)
+            .SortByDescending(thread => thread.CreatedAt)
+            .ToListAsync(cancellationToken);
+        return Ok(threads);
     }
 
     [HttpGet("categories")]
@@ -73,9 +31,9 @@ public class ForumController : ControllerBase
     }
 
     [HttpGet("threads/{id}")]
-    public ActionResult<ForumThread> GetThread(int id)
+    public async Task<ActionResult<ForumThread>> GetThread(int id, CancellationToken cancellationToken)
     {
-        var thread = Threads.FirstOrDefault(t => t.Id == id);
+        var thread = await _database.ForumThreads.Find(item => item.Id == id).FirstOrDefaultAsync(cancellationToken);
         if (thread is null)
         {
             return NotFound();
@@ -85,65 +43,80 @@ public class ForumController : ControllerBase
     }
 
     [HttpGet("threads/{id}/replies")]
-    public ActionResult<IEnumerable<ForumReply>> GetReplies(int id)
+    public async Task<ActionResult<IEnumerable<ForumReply>>> GetReplies(int id, CancellationToken cancellationToken)
     {
-        var thread = Threads.FirstOrDefault(t => t.Id == id);
+        var thread = await _database.ForumThreads.Find(item => item.Id == id).FirstOrDefaultAsync(cancellationToken);
         if (thread is null)
         {
             return NotFound();
         }
 
-        return Ok(thread.Replies.OrderBy(r => r.CreatedAt));
+        return Ok(thread.Replies.OrderBy(reply => reply.CreatedAt));
     }
 
     [HttpPost("threads")]
-    public ActionResult<ForumThread> CreateThread([FromBody] CreateForumThreadRequest request)
+    [Authorize]
+    public async Task<ActionResult<ForumThread>> CreateThread([FromBody] CreateForumThreadRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.Content))
         {
             return BadRequest("A title and content are required.");
         }
 
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        var account = await _database.Accounts.Find(item => item.Id == userId).FirstOrDefaultAsync(cancellationToken);
+        if (account is null) return Unauthorized();
+
         var thread = new ForumThread
         {
-            Id = Threads.Count == 0 ? 1 : Threads.Max(t => t.Id) + 1,
+            Id = await _database.NextIdAsync("forumThreads", cancellationToken),
             Title = request.Title.Trim(),
             Category = string.IsNullOrWhiteSpace(request.Category) ? "General" : request.Category,
-            Author = string.IsNullOrWhiteSpace(request.Author) ? "Guest" : request.Author,
+            Author = account.DisplayName,
             Content = request.Content.Trim(),
             IsAnonymous = request.IsAnonymous,
             CreatedAt = DateTime.UtcNow
         };
 
-        Threads.Insert(0, thread);
+        await _database.ForumThreads.InsertOneAsync(thread, cancellationToken: cancellationToken);
         return CreatedAtAction(nameof(GetThread), new { id = thread.Id }, thread);
     }
 
     [HttpPost("threads/{id}/replies")]
-    public ActionResult<ForumReply> AddReply(int id, [FromBody] CreateForumReplyRequest request)
+    [Authorize]
+    public async Task<ActionResult<ForumReply>> AddReply(int id, [FromBody] CreateForumReplyRequest request, CancellationToken cancellationToken)
     {
-        var thread = Threads.FirstOrDefault(t => t.Id == id);
-        if (thread is null)
-        {
-            return NotFound();
-        }
-
         if (string.IsNullOrWhiteSpace(request.Content))
         {
             return BadRequest("Reply content is required.");
         }
 
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        var account = await _database.Accounts.Find(item => item.Id == userId).FirstOrDefaultAsync(cancellationToken);
+        if (account is null) return Unauthorized();
+
         var reply = new ForumReply
         {
-            Id = thread.Replies.Count == 0 ? 1 : thread.Replies.Max(r => r.Id) + 1,
+            Id = await _database.NextIdAsync("forumReplies", cancellationToken),
             ThreadId = id,
-            Author = string.IsNullOrWhiteSpace(request.Author) ? "Guest" : request.Author,
+            Author = account.DisplayName,
             Content = request.Content.Trim(),
             IsAnonymous = request.IsAnonymous,
             CreatedAt = DateTime.UtcNow
         };
 
-        thread.Replies.Add(reply);
+        var result = await _database.ForumThreads.UpdateOneAsync(
+            thread => thread.Id == id,
+            Builders<ForumThread>.Update.Push(thread => thread.Replies, reply),
+            cancellationToken: cancellationToken);
+        if (result.MatchedCount == 0)
+        {
+            return NotFound();
+        }
+
         return Ok(reply);
     }
+
+    private bool TryGetUserId(out int userId) =>
+        int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out userId);
 }
