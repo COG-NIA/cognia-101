@@ -161,3 +161,8 @@ $RECYCLE.BIN/
 # JetBrains Rider
 .idea/
 *.sln.iml
+
+# Local environment secrets
+.env
+.env.*
+!.env.example

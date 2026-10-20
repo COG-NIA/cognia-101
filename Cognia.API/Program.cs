@@ -8,6 +8,12 @@ using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
+var localEnvPath = Path.Combine(builder.Environment.ContentRootPath, ".env");
+if (File.Exists(localEnvPath))
+{
+    DotNetEnv.Env.Load(localEnvPath);
+    builder.Configuration.AddEnvironmentVariables();
+}
 
 var mongoConnectionString = builder.Configuration["MongoDb:ConnectionString"]
     ?? throw new InvalidOperationException("MongoDb:ConnectionString must be configured.");

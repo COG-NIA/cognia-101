@@ -45,7 +45,20 @@ From the repository root, restore the solution:
 dotnet restore Cognia.slnx
 ```
 
-Configure local secrets. Do not put connection strings, signing keys, bootstrap tokens, or Paystack keys in tracked `appsettings*.json` files:
+For local development, put settings in the ignored `Cognia.API/.env` file. It already exists with blank values; or recreate it from the placeholder template with `Copy-Item Cognia.API/.env.example Cognia.API/.env`. The API loads this file on startup. Never put connection strings, signing keys, bootstrap tokens, or Paystack keys in tracked `appsettings*.json` files.
+
+```dotenv
+MongoDb__ConnectionString=<your-rotated-atlas-uri>
+MongoDb__DatabaseName=Cognia
+Jwt__SigningKey=<random-secret-at-least-32-bytes>
+Jwt__Issuer=Cognia
+Jwt__Audience=CogniaClient
+Admin__BootstrapToken=<one-time-random-bootstrap-token>
+Paystack__SecretKey=<rotated-paystack-test-secret-key>
+Cors__ClientOrigin=http://localhost:5000
+```
+
+Use .NET User Secrets if preferred:
 
 ```powershell
 dotnet user-secrets init --project Cognia.API/Cognia.API.csproj
