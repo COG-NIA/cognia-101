@@ -77,7 +77,7 @@ Start the API in one terminal using its HTTPS launch profile:
 dotnet run --project Cognia.API/Cognia.API.csproj --launch-profile https
 ```
 
-The API listens at `https://localhost:7214`, which is the address configured in the client. Trust the local ASP.NET Core development certificate if prompted or if the browser reports a certificate error.
+The API listens at `https://localhost:7214`. For local frontend testing, set `ApiBaseUrl` in `Cognia.Client/wwwroot/appsettings.json` to this address. Trust the local ASP.NET Core development certificate if prompted or if the browser reports a certificate error.
 
 Start the client in a second terminal:
 
@@ -92,6 +92,11 @@ Open `http://localhost:5000`.
 The database starts empty. Create the first administrator once by calling `POST /api/auth/bootstrap-admin` with the `X-Admin-Bootstrap-Token` header set to `Admin:BootstrapToken` and a JSON body containing `email`, `displayName`, and a password of at least 12 characters. The endpoint is disabled after an admin account exists. Sign in at `/login`; use the resulting admin account to create actual therapist and article records through the admin-only `POST /api/therapists` and `POST /api/articles` endpoints.
 
 For Azure, add these values under the API App Service's **Configuration** settings instead of user-secrets: `MongoDb__ConnectionString`, `MongoDb__DatabaseName`, `Jwt__SigningKey`, `Jwt__Issuer`, `Jwt__Audience`, `Admin__BootstrapToken`, `Paystack__SecretKey`, and `Cors__ClientOrigin`. Set the frontend's `ApiBaseUrl` in `Cognia.Client/wwwroot/appsettings.json` to the deployed API origin before publishing the client.
+
+## Deployments
+
+- Client: [Cognia static website](https://cogniaclientee03428f5e.z1.web.core.windows.net/)
+- API App Service: [Cognia API host](https://cognia-geema6hwa2c6emf6.westus3-01.azurewebsites.net/) (API deployment pending; the host currently serves the Azure welcome page.)
 
 ## API Routes
 
