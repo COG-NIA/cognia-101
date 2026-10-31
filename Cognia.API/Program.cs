@@ -1,4 +1,5 @@
 using System.Text;
+using Cognia.API.Configuration;
 using Cognia.API.Data;
 using Cognia.API.Models;
 using Cognia.API.Services;
@@ -15,15 +16,15 @@ if (File.Exists(localEnvPath))
     builder.Configuration.AddEnvironmentVariables();
 }
 
-var mongoConnectionString = builder.Configuration["MongoDb:ConnectionString"]
-    ?? throw new InvalidOperationException("MongoDb:ConnectionString must be configured.");
+var isDevelopment = builder.Environment.IsDevelopment();
+
+var mongoConnectionString = RuntimeConfig.GetMongoConnectionString(
+    builder.Configuration["MongoDb:ConnectionString"],
+    isDevelopment);
 var mongoDatabaseName = builder.Configuration["MongoDb:DatabaseName"] ?? "Cognia";
-var jwtSigningKey = builder.Configuration["Jwt:SigningKey"]
-    ?? throw new InvalidOperationException("Jwt:SigningKey must be configured.");
-if (Encoding.UTF8.GetByteCount(jwtSigningKey) < 32)
-{
-    throw new InvalidOperationException("Jwt:SigningKey must contain at least 32 bytes.");
-}
+var jwtSigningKey = RuntimeConfig.GetJwtSigningKey(
+    builder.Configuration["Jwt:SigningKey"],
+    isDevelopment);
 
 var mongoClient = new MongoClient(mongoConnectionString);
 builder.Services.AddSingleton(mongoClient.GetDatabase(mongoDatabaseName));

@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Security.Claims;
 using System.Text;
+using Cognia.API.Configuration;
 using Cognia.API.Data;
 using Cognia.API.Models;
 using Microsoft.AspNetCore.Identity;
@@ -121,8 +122,8 @@ public sealed class AuthController : ControllerBase
 
     private AuthResponse CreateResponse(UserAccount account)
     {
-        var key = _configuration["Jwt:SigningKey"]
-            ?? throw new InvalidOperationException("Jwt:SigningKey must be configured.");
+        var isDevelopment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
+        var key = RuntimeConfig.GetJwtSigningKey(_configuration["Jwt:SigningKey"], isDevelopment);
         var issuer = _configuration["Jwt:Issuer"] ?? "Cognia";
         var audience = _configuration["Jwt:Audience"] ?? "CogniaClient";
         var claims = new[]
